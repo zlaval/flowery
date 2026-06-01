@@ -1,73 +1,54 @@
-# React + TypeScript + Vite
+# Flowery - Visual Architecture Planner & Message Flow Simulator
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Flowery is an interactive visual system architecture designer and real-time message flow simulator. Built with a premium, dark-themed developer dashboard, it allows developers and architects to model microservice dependencies, configure endpoint parameters, define JSON payloads, and simulate parallel message delivery runs across various network protocols.
 
-Currently, two official plugins are available:
+![Flowery Dashboard Preview](./image.png)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Core Features
 
-## React Compiler
+- **Interactive Canvas Editor**: Easily add and drag nodes representing **Microservices**, **Databases**, **Message Queues (Kafka)**, and **External APIs** using a grid-snapped canvas powered by React Flow.
+- **Dynamic Telemetry Inspector**: Select any node or connection line to configure network addresses, base paths, database names, and descriptions.
+- **Validating Code Viewer**: Write JSON transmission payloads inside a built-in code editor in the sidebar inspector featuring real-time syntax verification, error details, and an auto-formatter.
+- **Live Path Simulation**: 
+  - Mark any service node as the starting **Trigger Point**.
+  - Switch to **Simulate Mode** to lock the canvas and run automatic or step-by-step message flows.
+  - Watch glowing message packet circles travel down bezier curves along active connection lines, supporting complex parallel paths.
+  - Regulate flow speed on-the-fly using the speed multiplier slider HUD.
+- **Mock Actions & Alerts**: Interactive Toast indicators for mockup save and open actions, plus confirmation prompts to reset designs.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Tech Stack
 
-## Expanding the ESLint configuration
+- **Framework**: [React 19](https://react.dev/) + [Vite](https://vite.dev/) + [TypeScript](https://www.typescriptlang.org/)
+- **Visual Nodes Canvas**: [React Flow / @xyflow/react](https://reactflow.dev/)
+- **State Management**: [Zustand](https://zustand-demo.pmnd.rs/) (high performance, selective re-renders)
+- **Styling**: [Tailwind CSS v4](https://tailwindcss.com/) (modern CSS-first compiler)
+- **Icons**: [Lucide React](https://lucide.dev/)
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Getting Started
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+### Prerequisites
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+Make sure you have Node.js (version 18 or higher) installed.
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+### Installation
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+1. Clone this repository to your local machine:
+   ```bash
+   git clone https://github.com/your-username/flowery.git
+   cd flowery
+   ```
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+2. Install the project dependencies:
+   ```bash
+   npm install
+   ```
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+3. Launch the local development server:
+   ```bash
+   npm run dev
+   ```
+
+4. Compile the project for production deployment:
+   ```bash
+   npm run build
+   ```
