@@ -1,0 +1,153 @@
+import { memo } from 'react';
+import { Handle, Position } from '@xyflow/react';
+import type { NodeProps } from '@xyflow/react';
+import { Server, Database, MessageSquare, Globe, Flame } from 'lucide-react';
+import type { NodeType, CustomNodeData } from '../store/useStore';
+
+const typeConfigs: Record<
+  NodeType,
+  {
+    colorClass: string;
+    borderClass: string;
+    bgClass: string;
+    glowClass: string;
+    icon: React.ComponentType<any>;
+    typeName: string;
+  }
+> = {
+  microservice: {
+    colorClass: 'text-emerald-400',
+    borderClass: 'border-emerald-500/30',
+    bgClass: 'bg-emerald-950/20',
+    glowClass: 'shadow-emerald-500/20 ring-emerald-500/40',
+    icon: Server,
+    typeName: 'Microservice',
+  },
+  database: {
+    colorClass: 'text-blue-400',
+    borderClass: 'border-blue-500/30',
+    bgClass: 'bg-blue-950/20',
+    glowClass: 'shadow-blue-500/20 ring-blue-500/40',
+    icon: Database,
+    typeName: 'Database',
+  },
+  kafka: {
+    colorClass: 'text-purple-400',
+    borderClass: 'border-purple-500/30',
+    bgClass: 'bg-purple-950/20',
+    glowClass: 'shadow-purple-500/20 ring-purple-500/40',
+    icon: MessageSquare,
+    typeName: 'Message Queue',
+  },
+  api: {
+    colorClass: 'text-amber-400',
+    borderClass: 'border-amber-500/30',
+    bgClass: 'bg-amber-950/20',
+    glowClass: 'shadow-amber-500/20 ring-amber-500/40',
+    icon: Globe,
+    typeName: 'External API',
+  },
+};
+
+const CustomNode = ({ data, selected }: NodeProps<any>) => {
+  const nodeData = data as CustomNodeData;
+  const config = typeConfigs[nodeData.type] || typeConfigs.microservice;
+  const Icon = config.icon;
+
+  return (
+    <div
+      className={`relative w-64 rounded-xl border bg-slate-900/90 p-4 text-slate-100 shadow-2xl backdrop-blur-md transition-all duration-300 ${
+        selected ? 'border-indigo-500 ring-2 ring-indigo-500/30' : nodeData.hasMessage ? 'border-indigo-400 ring-4 ring-indigo-500/50 scale-102' : config.borderClass
+      } ${nodeData.hasMessage ? config.glowClass : ''}`}
+    >
+      {/* Handles */}
+      <Handle
+        type="target"
+        position={Position.Left}
+        id="input"
+        className="!h-3 !w-3 !bg-slate-700 hover:!bg-indigo-500"
+      />
+      
+      {/* Node Header */}
+      <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+        <div className="flex items-center gap-2">
+          <div className={`rounded-lg p-1.5 ${config.bgClass} ${config.colorClass}`}>
+            <Icon size={18} />
+          </div>
+          <div>
+            <h4 className="font-semibold text-sm text-slate-200 tracking-wide truncate max-w-[120px]">
+              {nodeData.label}
+            </h4>
+            <span className="text-[10px] text-slate-400 uppercase font-mono">
+              {config.typeName}
+            </span>
+          </div>
+        </div>
+
+        {/* Trigger Point & Active Message Badges */}
+        <div className="flex gap-1.5 items-center">
+          {nodeData.isTrigger && (
+            <span className="flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[9px] font-semibold bg-indigo-950 text-indigo-300 border border-indigo-500/30 animate-pulse">
+              <Flame size={10} className="fill-indigo-400" />
+              Start
+            </span>
+          )}
+          {nodeData.hasMessage && (
+            <span className="flex h-2.5 w-2.5 relative">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-indigo-500"></span>
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Node Details (depends on type) */}
+      <div className="mt-2.5 space-y-1 text-[11px] font-mono text-slate-400">
+        {nodeData.type === 'microservice' && (
+          <div className="flex justify-between">
+            <span>Host:</span>
+            <span className="text-slate-300 font-semibold">{nodeData.host || '127.0.0.1'}</span>
+          </div>
+        )}
+        {nodeData.type === 'database' && (
+          <>
+            <div className="flex justify-between">
+              <span>DB:</span>
+              <span className="text-slate-300 font-semibold">{nodeData.dbName || 'db'}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Port:</span>
+              <span className="text-slate-300 font-semibold">{nodeData.port || '5432'}</span>
+            </div>
+          </>
+        )}
+        {nodeData.type === 'kafka' && (
+          <div className="flex justify-between">
+            <span>Broker:</span>
+            <span className="text-slate-300 font-semibold truncate max-w-[110px]">
+              {nodeData.host || 'localhost'}
+            </span>
+          </div>
+        )}
+        {nodeData.type === 'api' && (
+          <div className="flex flex-col gap-0.5">
+            <span>Base URL:</span>
+            <span className="text-slate-300 font-semibold truncate block" title={nodeData.url}>
+              {nodeData.url || 'https://api.com'}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Handle */}
+      <Handle
+        type="source"
+        position={Position.Right}
+        id="output"
+        className="!h-3 !w-3 !bg-slate-700 hover:!bg-indigo-500"
+      />
+    </div>
+  );
+};
+
+export default memo(CustomNode);
