@@ -51,6 +51,12 @@ export default function FlowCanvas() {
   const handleNodeClick = useCallback<NodeMouseHandler>(
     (_, node) => {
       selectElement({ type: 'node', id: node.id });
+    },
+    [selectElement]
+  );
+
+  const handleNodeDoubleClick = useCallback<NodeMouseHandler>(
+    (_, node) => {
       if (mode === 'edit') {
         setRenameModal({
           isOpen: true,
@@ -59,7 +65,7 @@ export default function FlowCanvas() {
         });
       }
     },
-    [selectElement, mode, setRenameModal]
+    [mode, setRenameModal]
   );
 
   const handleEdgeClick = useCallback<EdgeMouseHandler>(
@@ -122,6 +128,7 @@ export default function FlowCanvas() {
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         onNodeClick={handleNodeClick}
+        onNodeDoubleClick={handleNodeDoubleClick}
         onEdgeClick={handleEdgeClick}
         onPaneClick={handlePaneClick}
         onNodeContextMenu={onNodeContextMenu}

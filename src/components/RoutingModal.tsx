@@ -14,6 +14,11 @@ export default function RoutingModal() {
   const [sourceRoutes, setSourceRoutes] = useState<Record<string, boolean>>({});
   const [targetRoutes, setTargetRoutes] = useState<Record<string, boolean>>({});
 
+  // Dragging offset position state
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+
   // Sync state when modal opens
   useEffect(() => {
     if (routingModal) {
@@ -44,6 +49,50 @@ export default function RoutingModal() {
       setTargetRoutes(initialTargetRoutes);
     }
   }, [routingModal, nodes, edges]);
+
+  // Handle drag movement of the modal
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDragging) return;
+      setPosition({
+        x: e.clientX - dragStart.x,
+        y: e.clientY - dragStart.y,
+      });
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+    };
+
+    if (isDragging) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+    }
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging, dragStart]);
+
+  // Reset relative coordinates when modal is opened
+  useEffect(() => {
+    if (routingModal) {
+      setPosition({ x: 0, y: 0 });
+    }
+  }, [routingModal]);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    // Prevent dragging if clicking an interactive element
+    const isInteractive = (e.target as HTMLElement).closest('button, input, [role="button"], a');
+    if (isInteractive) return;
+
+    setIsDragging(true);
+    setDragStart({
+      x: e.clientX - position.x,
+      y: e.clientY - position.y,
+    });
+  };
 
   if (!routingModal || !routingModal.isOpen) return null;
 
@@ -77,10 +126,20 @@ export default function RoutingModal() {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 animate-fade-in select-none">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-5 shadow-2xl flex flex-col gap-4 text-slate-100 font-sans animate-scale-in">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/20 p-4 animate-fade-in select-none">
+      <div
+        style={{
+          position: 'relative',
+          left: `${position.x}px`,
+          top: `${position.y}px`,
+        }}
+        className="bg-slate-900/90 backdrop-blur-md border border-slate-800 rounded-2xl w-full max-w-lg p-5 shadow-2xl flex flex-col gap-4 text-slate-100 font-sans animate-scale-in"
+      >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div
+          onMouseDown={handleMouseDown}
+          className="flex items-center justify-between border-b border-slate-800 pb-3 cursor-grab active:cursor-grabbing select-none"
+        >
           <div className="flex items-center gap-2">
             <div className="rounded-lg p-1.5 bg-indigo-950 text-indigo-400">
               <Settings size={18} />
