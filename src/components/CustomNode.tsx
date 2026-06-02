@@ -79,6 +79,31 @@ const CustomNode = ({ id, data, selected }: NodeProps<any>) => {
     nodeData.type === 'start' && state.edges.some((e) => e.source === id)
   );
 
+  // Active handles config
+  const activeHandles = nodeData.activeHandles || (
+    nodeData.type === 'start' ? ['output'] : ['input', 'output']
+  );
+
+  // Left side spacing
+  const showInputLeft = activeHandles.includes('input');
+  const showOutputLeft = activeHandles.includes('output-left');
+  const bothLeft = showInputLeft && showOutputLeft;
+
+  // Right side spacing
+  const showInputRight = activeHandles.includes('input-right');
+  const showOutputRight = activeHandles.includes('output');
+  const bothRight = showInputRight && showOutputRight;
+
+  // Top side spacing
+  const showInputTop = activeHandles.includes('input-top');
+  const showOutputTop = activeHandles.includes('output-top');
+  const bothTop = showInputTop && showOutputTop;
+
+  // Bottom side spacing
+  const showInputBottom = activeHandles.includes('input-bottom');
+  const showOutputBottom = activeHandles.includes('output-bottom');
+  const bothBottom = showInputBottom && showOutputBottom;
+
   const handleStartClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (mode === 'edit') {
@@ -106,69 +131,85 @@ const CustomNode = ({ id, data, selected }: NodeProps<any>) => {
         />
       ) : (
         <>
-          {/* Left Side (spaced) */}
-          <Handle
-            type="target"
-            position={Position.Left}
-            id="input"
-            style={{ top: '35%' }}
-            className="!h-3 !w-3 !bg-blue-500 hover:!bg-blue-400 hover:scale-125 border border-slate-950 shadow rounded-full transition-all cursor-crosshair z-20"
-          />
-          <Handle
-            type="source"
-            position={Position.Left}
-            id="output-left"
-            style={{ top: '65%' }}
-            className="!h-3 !w-3 !bg-orange-600 hover:!bg-orange-500 hover:scale-125 border border-slate-950 shadow rounded-full transition-all cursor-crosshair z-20"
-          />
+          {/* Left Side */}
+          {showInputLeft && (
+            <Handle
+              type="target"
+              position={Position.Left}
+              id="input"
+              style={{ top: bothLeft ? '35%' : '50%' }}
+              className="!h-3 !w-3 !bg-blue-500 hover:!bg-blue-400 hover:scale-125 border border-slate-950 shadow rounded-full transition-all cursor-crosshair z-20"
+            />
+          )}
+          {showOutputLeft && (
+            <Handle
+              type="source"
+              position={Position.Left}
+              id="output-left"
+              style={{ top: bothLeft ? '65%' : '50%' }}
+              className="!h-3 !w-3 !bg-orange-600 hover:!bg-orange-500 hover:scale-125 border border-slate-950 shadow rounded-full transition-all cursor-crosshair z-20"
+            />
+          )}
 
-          {/* Right Side (spaced) */}
-          <Handle
-            type="target"
-            position={Position.Right}
-            id="input-right"
-            style={{ top: '35%' }}
-            className="!h-3 !w-3 !bg-blue-500 hover:!bg-blue-400 hover:scale-125 border border-slate-950 shadow rounded-full transition-all cursor-crosshair z-20"
-          />
-          <Handle
-            type="source"
-            position={Position.Right}
-            id="output"
-            style={{ top: '65%' }}
-            className="!h-3 !w-3 !bg-orange-600 hover:!bg-orange-500 hover:scale-125 border border-slate-950 shadow rounded-full transition-all cursor-crosshair z-20"
-          />
+          {/* Right Side */}
+          {showInputRight && (
+            <Handle
+              type="target"
+              position={Position.Right}
+              id="input-right"
+              style={{ top: bothRight ? '35%' : '50%' }}
+              className="!h-3 !w-3 !bg-blue-500 hover:!bg-blue-400 hover:scale-125 border border-slate-950 shadow rounded-full transition-all cursor-crosshair z-20"
+            />
+          )}
+          {showOutputRight && (
+            <Handle
+              type="source"
+              position={Position.Right}
+              id="output"
+              style={{ top: bothRight ? '65%' : '50%' }}
+              className="!h-3 !w-3 !bg-orange-600 hover:!bg-orange-500 hover:scale-125 border border-slate-950 shadow rounded-full transition-all cursor-crosshair z-20"
+            />
+          )}
 
-          {/* Top Side (spaced) */}
-          <Handle
-            type="target"
-            position={Position.Top}
-            id="input-top"
-            style={{ left: '35%' }}
-            className="!h-3 !w-3 !bg-blue-500 hover:!bg-blue-400 hover:scale-125 border border-slate-950 shadow rounded-full transition-all cursor-crosshair z-20"
-          />
-          <Handle
-            type="source"
-            position={Position.Top}
-            id="output-top"
-            style={{ left: '65%' }}
-            className="!h-3 !w-3 !bg-orange-600 hover:!bg-orange-500 hover:scale-125 border border-slate-950 shadow rounded-full transition-all cursor-crosshair z-20"
-          />
+          {/* Top Side */}
+          {showInputTop && (
+            <Handle
+              type="target"
+              position={Position.Top}
+              id="input-top"
+              style={{ left: bothTop ? '35%' : '50%' }}
+              className="!h-3 !w-3 !bg-blue-500 hover:!bg-blue-400 hover:scale-125 border border-slate-950 shadow rounded-full transition-all cursor-crosshair z-20"
+            />
+          )}
+          {showOutputTop && (
+            <Handle
+              type="source"
+              position={Position.Top}
+              id="output-top"
+              style={{ left: bothTop ? '65%' : '50%' }}
+              className="!h-3 !w-3 !bg-orange-600 hover:!bg-orange-500 hover:scale-125 border border-slate-950 shadow rounded-full transition-all cursor-crosshair z-20"
+            />
+          )}
 
-          {/* Bottom Side (spaced) */}
-          <Handle
-            type="target"
-            position={Position.Bottom}
-            id="input-bottom"
-            style={{ left: '35%' }}
-            className="!h-3 !w-3 !bg-blue-500 hover:!bg-blue-400 hover:scale-125 border border-slate-950 shadow rounded-full transition-all cursor-crosshair z-20"
-          />
-          <Handle
-            type="source"
-            position={Position.Bottom}
-            id="output-bottom"
-            style={{ left: '65%' }}
-            className="!h-3 !w-3 !bg-orange-600 hover:!bg-orange-500 hover:scale-125 border border-slate-950 shadow rounded-full transition-all cursor-crosshair z-20"
-          />
+          {/* Bottom Side */}
+          {showInputBottom && (
+            <Handle
+              type="target"
+              position={Position.Bottom}
+              id="input-bottom"
+              style={{ left: bothBottom ? '35%' : '50%' }}
+              className="!h-3 !w-3 !bg-blue-500 hover:!bg-blue-400 hover:scale-125 border border-slate-950 shadow rounded-full transition-all cursor-crosshair z-20"
+            />
+          )}
+          {showOutputBottom && (
+            <Handle
+              type="source"
+              position={Position.Bottom}
+              id="output-bottom"
+              style={{ left: bothBottom ? '65%' : '50%' }}
+              className="!h-3 !w-3 !bg-orange-600 hover:!bg-orange-500 hover:scale-125 border border-slate-950 shadow rounded-full transition-all cursor-crosshair z-20"
+            />
+          )}
         </>
       )}
       

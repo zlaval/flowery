@@ -46,6 +46,7 @@ export default function FlowCanvas() {
     deleteEdge,
     setTriggerNode,
     setRenameModal,
+    toggleNodeHandle,
   } = useStore();
 
   const [menu, setMenu] = useState<MenuState>({ visible: false, x: 0, y: 0 });
@@ -195,13 +196,17 @@ export default function FlowCanvas() {
       {menu.visible && (
         <div
           style={{ top: menu.y, left: menu.x }}
-          className="fixed z-50 min-w-[170px] bg-slate-900/95 border border-slate-800 rounded-xl shadow-2xl p-1.5 backdrop-blur-md select-none font-sans"
+          onClick={(e) => e.stopPropagation()}
+          className="fixed z-50 min-w-[175px] bg-slate-900/95 border border-slate-800 rounded-xl shadow-2xl p-2.5 backdrop-blur-md select-none font-sans"
         >
           {menu.nodeId ? (
             // Node Context Options
             <div className="space-y-0.5">
               <button
-                onClick={() => setTriggerNode(menu.nodeId!)}
+                onClick={() => {
+                  setTriggerNode(menu.nodeId!);
+                  setMenu({ visible: false, x: 0, y: 0 });
+                }}
                 className="w-full text-left px-3 py-2 text-xs font-semibold text-slate-300 hover:text-white hover:bg-indigo-600 rounded-lg flex items-center gap-2 cursor-pointer transition-colors"
               >
                 <Flame size={13} className="text-indigo-400" />
@@ -210,19 +215,121 @@ export default function FlowCanvas() {
               {mode === 'edit' && (
                 <>
                   <button
-                    onClick={() => duplicateNode(menu.nodeId!)}
+                    onClick={() => {
+                      duplicateNode(menu.nodeId!);
+                      setMenu({ visible: false, x: 0, y: 0 });
+                    }}
                     className="w-full text-left px-3 py-2 text-xs font-semibold text-slate-300 hover:text-white hover:bg-indigo-600 rounded-lg flex items-center gap-2 cursor-pointer transition-colors"
                   >
                     <Copy size={13} className="text-emerald-400" />
                     Duplicate Node
                   </button>
                   <button
-                    onClick={() => deleteNode(menu.nodeId!)}
+                    onClick={() => {
+                      deleteNode(menu.nodeId!);
+                      setMenu({ visible: false, x: 0, y: 0 });
+                    }}
                     className="w-full text-left px-3 py-2 text-xs font-semibold text-red-400 hover:text-white hover:bg-red-600 rounded-lg flex items-center gap-2 cursor-pointer transition-colors animate-pulse"
                   >
                     <Trash2 size={13} />
                     Delete Node
                   </button>
+
+                  {(() => {
+                    const contextNode = nodes.find((n) => n.id === menu.nodeId);
+                    if (!contextNode || contextNode.data.type === 'start') return null;
+
+                    const activeHandles = contextNode.data.activeHandles || ['input', 'output'];
+
+                    return (
+                      <div className="border-t border-slate-800 mt-2 pt-2 px-1">
+                        <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 pl-0.5">
+                          Active Handles
+                        </div>
+                        <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 p-0.5 text-[11px]">
+                          {/* Left */}
+                          <label className="flex items-center gap-1.5 text-slate-400 hover:text-white cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={activeHandles.includes('input')}
+                              onChange={() => toggleNodeHandle(contextNode.id, 'input')}
+                              className="accent-indigo-500 rounded border-slate-800"
+                            />
+                            <span>In (L)</span>
+                          </label>
+                          <label className="flex items-center gap-1.5 text-slate-400 hover:text-white cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={activeHandles.includes('output-left')}
+                              onChange={() => toggleNodeHandle(contextNode.id, 'output-left')}
+                              className="accent-indigo-500 rounded border-slate-800"
+                            />
+                            <span>Out (L)</span>
+                          </label>
+
+                          {/* Right */}
+                          <label className="flex items-center gap-1.5 text-slate-400 hover:text-white cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={activeHandles.includes('input-right')}
+                              onChange={() => toggleNodeHandle(contextNode.id, 'input-right')}
+                              className="accent-indigo-500 rounded border-slate-800"
+                            />
+                            <span>In (R)</span>
+                          </label>
+                          <label className="flex items-center gap-1.5 text-slate-400 hover:text-white cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={activeHandles.includes('output')}
+                              onChange={() => toggleNodeHandle(contextNode.id, 'output')}
+                              className="accent-indigo-500 rounded border-slate-800"
+                            />
+                            <span>Out (R)</span>
+                          </label>
+
+                          {/* Top */}
+                          <label className="flex items-center gap-1.5 text-slate-400 hover:text-white cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={activeHandles.includes('input-top')}
+                              onChange={() => toggleNodeHandle(contextNode.id, 'input-top')}
+                              className="accent-indigo-500 rounded border-slate-800"
+                            />
+                            <span>In (T)</span>
+                          </label>
+                          <label className="flex items-center gap-1.5 text-slate-400 hover:text-white cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={activeHandles.includes('output-top')}
+                              onChange={() => toggleNodeHandle(contextNode.id, 'output-top')}
+                              className="accent-indigo-500 rounded border-slate-800"
+                            />
+                            <span>Out (T)</span>
+                          </label>
+
+                          {/* Bottom */}
+                          <label className="flex items-center gap-1.5 text-slate-400 hover:text-white cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={activeHandles.includes('input-bottom')}
+                              onChange={() => toggleNodeHandle(contextNode.id, 'input-bottom')}
+                              className="accent-indigo-500 rounded border-slate-800"
+                            />
+                            <span>In (B)</span>
+                          </label>
+                          <label className="flex items-center gap-1.5 text-slate-400 hover:text-white cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={activeHandles.includes('output-bottom')}
+                              onChange={() => toggleNodeHandle(contextNode.id, 'output-bottom')}
+                              className="accent-indigo-500 rounded border-slate-800"
+                            />
+                            <span>Out (B)</span>
+                          </label>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </>
               )}
             </div>

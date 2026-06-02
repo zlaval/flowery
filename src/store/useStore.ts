@@ -42,6 +42,7 @@ export interface CustomNodeData extends Record<string, unknown> {
   dbName?: string;
   url?: string;
   responseTemplate?: string; // Optional response template JSON string
+  activeHandles?: string[];
   // routingTable: Record<inboundEdgeId | 'trigger', Record<outboundEdgeId, boolean>>
   routingTable?: Record<string, Record<string, boolean>>;
 }
@@ -91,6 +92,7 @@ interface AppState {
   updateEdgeData: (id: string, data: Partial<CustomEdgeData>) => void;
   deleteNode: (id: string) => void;
   deleteEdge: (id: string) => void;
+  toggleNodeHandle: (nodeId: string, handleId: string) => void;
   clearCanvas: () => void;
   
   // Selection actions
@@ -746,6 +748,83 @@ export const useStore = create<AppState>((set, get) => {
         edges: get().edges.filter((edge) => edge.id !== id),
         nodes: updatedNodes,
         selectedElement: get().selectedElement?.id === id ? null : get().selectedElement,
+      });
+    },
+
+    toggleNodeHandle: (nodeId, handleId) => {
+      const node = get().nodes.find((n) => n.id === nodeId);
+      if (!node) return;
+
+      const currentHandles = node.data.activeHandles || (
+        node.data.type === 'start' ? ['output'] : ['input', 'output']
+      );
+      const isRemoving = currentHandles.includes(handleId);
+      const updatedHandles = isRemoving
+        ? currentHandles.filter((h) => h !== handleId)
+        : [...currentHandles, handleId];
+
+      let edgesToKeep = get().edges;
+      let nodesList = get().nodes.map((n) => {
+        if (n.id === nodeId) {
+          return {
+            ...n,
+            data: {
+              ...n.data,
+              activeHandles: updatedHandles,
+            },
+          };
+        }
+        return n;
+      }) as AppNode[];
+
+      if (isRemoving) {
+        // Find edge IDs to delete
+        const edgesToDelete = get().edges.filter(
+          (edge) =>
+            (edge.source === nodeId && edge.sourceHandle === handleId) ||
+            (edge.target === nodeId && edge.targetHandle === handleId) ||
+            (edge.source === nodeId && handleId === 'output' && !edge.sourceHandle) ||
+            (edge.target === nodeId && handleId === 'input' && !edge.targetHandle)
+        );
+
+        const edgeIdsToDelete = edgesToDelete.map((e) => e.id);
+        edgesToKeep = get().edges.filter((e) => !edgeIdsToDelete.includes(e.id));
+
+        // Clean each deleted edge ID from inbound rows and outbound mappings of all nodes
+        nodesList = nodesList.map((n) => {
+          const routingTable = { ...n.data.routingTable };
+          let modified = false;
+
+          edgeIdsToDelete.forEach((id) => {
+            // Delete inbound row mapping
+            if (id in routingTable) {
+              delete routingTable[id];
+              modified = true;
+            }
+
+            // Delete from checkbox selections inside other inbound mappings
+            Object.keys(routingTable).forEach((key) => {
+              if (routingTable[key] && id in routingTable[key]) {
+                routingTable[key] = { ...routingTable[key] };
+                delete routingTable[key][id];
+                modified = true;
+              }
+            });
+          });
+
+          if (modified) {
+            return {
+              ...n,
+              data: { ...n.data, routingTable },
+            };
+          }
+          return n;
+        }) as AppNode[];
+      }
+
+      set({
+        nodes: nodesList,
+        edges: edgesToKeep,
       });
     },
 
