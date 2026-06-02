@@ -506,20 +506,33 @@ export const useStore = create<AppState>((set, get) => {
         },
       };
 
-      // V3 Refinement: Dynamically update source node routingTable, default to false (opt-in)
+      // V3 Refinement: Dynamically update source node routingTable
+      const isInboundFromStart = (inboundEdgeId: string) => {
+        const edge = get().edges.find((e) => e.id === inboundEdgeId);
+        if (!edge) return false;
+        const srcNode = get().nodes.find((n) => n.id === edge.source);
+        return srcNode?.data.type === 'start';
+      };
+
+      const sourceNode = get().nodes.find((n) => n.id === connection.source);
+      const isSourceStart = sourceNode?.data.type === 'start';
+
       const updatedNodes = get().nodes.map((node) => {
         if (node.id === connection.source) {
           const routingTable = { ...node.data.routingTable };
           
-          // Append new Edge ID to all existing inbound connection keys in the table, default to false
+          // Append new Edge ID to all existing inbound connection keys in the table
           const keys = Object.keys(routingTable);
           if (keys.length === 0) {
-            routingTable['trigger'] = { [edgeId]: false };
+            const isStart = node.data.type === 'start';
+            routingTable['trigger'] = { [edgeId]: isStart };
           } else {
             keys.forEach((key) => {
+              const isStart = node.data.type === 'start';
+              const isFromStart = isStart || isInboundFromStart(key);
               routingTable[key] = {
                 ...routingTable[key],
-                [edgeId]: false,
+                [edgeId]: isFromStart, // true if inbound originates from Start, false otherwise
               };
             });
           }
@@ -529,13 +542,13 @@ export const useStore = create<AppState>((set, get) => {
             data: { ...node.data, routingTable },
           };
         } else if (node.id === connection.target) {
-          // Initialize routing table mapping row for the target node receiving edgeId, defaulting target's outbound connections to false
+          // Initialize routing table mapping row for the target node receiving edgeId
           const routingTable = { ...node.data.routingTable };
           
-          const outgoingEdges = get().edges.filter((e) => e.source === node.id);
+          const outgoingEdges = get().edges.filter((e) => e.source === node.id && e.target !== node.id);
           const targetRoutes: Record<string, boolean> = {};
           outgoingEdges.forEach((e) => {
-            targetRoutes[e.id] = false;
+            targetRoutes[e.id] = isSourceStart; // true if inbound originates from Start, false otherwise
           });
 
           routingTable[edgeId] = {
@@ -551,19 +564,16 @@ export const useStore = create<AppState>((set, get) => {
         return node;
       }) as AppNode[];
 
-      const sourceNode = get().nodes.find((n) => n.id === connection.source);
       const sourceInbounds = get().edges.filter((e) => e.target === connection.source && e.source !== connection.source);
-      const hasSourceOptions = !!(sourceNode?.data.isTrigger || sourceInbounds.length > 0);
-
       const targetOutbounds = get().edges.filter((e) => e.source === connection.target && e.target !== connection.target);
-      const hasTargetOptions = targetOutbounds.length > 0;
 
-      const hasRoutingOptions = hasSourceOptions || hasTargetOptions;
+      // popup condition: source is not start, source has inbound, target has outbound
+      const shouldShowPopup = !isSourceStart && sourceInbounds.length > 0 && targetOutbounds.length > 0;
 
       set({
         edges: [...get().edges, newEdge],
         nodes: updatedNodes,
-        routingModal: hasRoutingOptions
+        routingModal: shouldShowPopup
           ? {
               isOpen: true,
               edgeId,

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useStore } from '../store/useStore';
-import { X, ArrowRight, Settings, Check } from 'lucide-react';
+import { X, Settings, Check } from 'lucide-react';
 
 export default function RoutingModal() {
   const {
@@ -8,11 +8,11 @@ export default function RoutingModal() {
     edges,
     routingModal,
     setRoutingModal,
-    saveConnectionRouting,
+    updateNodeData,
   } = useStore();
 
-  const [sourceRoutes, setSourceRoutes] = useState<Record<string, boolean>>({});
-  const [targetRoutes, setTargetRoutes] = useState<Record<string, boolean>>({});
+  const [localRoutingTable, setLocalRoutingTable] = useState<Record<string, Record<string, boolean>>>({});
+  const [selectedInboundId, setSelectedInboundId] = useState<string>('');
 
   // Dragging offset position state
   const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -22,33 +22,14 @@ export default function RoutingModal() {
   // Sync state when modal opens
   useEffect(() => {
     if (routingModal) {
-      const { sourceId, targetId, edgeId } = routingModal;
-      const sourceNode = nodes.find((n) => n.id === sourceId);
+      const { targetId, edgeId } = routingModal;
       const targetNode = nodes.find((n) => n.id === targetId);
-
-      if (!sourceNode || !targetNode) return;
-
-      // Inbound sources of Node A
-      const sourceInbounds = edges.filter((e) => e.target === sourceId && e.source !== sourceId && e.id !== edgeId);
-      const initialSourceRoutes: Record<string, boolean> = {};
-      if (sourceNode.data.isTrigger) {
-        initialSourceRoutes['trigger'] = false;
+      if (targetNode) {
+        setLocalRoutingTable(targetNode.data.routingTable || {});
       }
-      sourceInbounds.forEach((e) => {
-        initialSourceRoutes[e.id] = false;
-      });
-
-      // Outbound targets of Node B
-      const targetOutbounds = edges.filter((e) => e.source === targetId && e.target !== targetId && e.id !== edgeId);
-      const initialTargetRoutes: Record<string, boolean> = {};
-      targetOutbounds.forEach((e) => {
-        initialTargetRoutes[e.id] = false;
-      });
-
-      setSourceRoutes(initialSourceRoutes);
-      setTargetRoutes(initialTargetRoutes);
+      setSelectedInboundId(edgeId);
     }
-  }, [routingModal, nodes, edges]);
+  }, [routingModal, nodes]);
 
   // Handle drag movement of the modal
   useEffect(() => {
@@ -83,8 +64,8 @@ export default function RoutingModal() {
   }, [routingModal]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
-    // Prevent dragging if clicking an interactive element
-    const isInteractive = (e.target as HTMLElement).closest('button, input, [role="button"], a');
+    // Prevent dragging if clicking an interactive element like select, button, input etc.
+    const isInteractive = (e.target as HTMLElement).closest('button, input, [role="button"], select, a');
     if (isInteractive) return;
 
     setIsDragging(true);
@@ -96,33 +77,32 @@ export default function RoutingModal() {
 
   if (!routingModal || !routingModal.isOpen) return null;
 
-  const { sourceId, targetId, edgeId } = routingModal;
-  const sourceNode = nodes.find((n) => n.id === sourceId);
+  const { targetId } = routingModal;
   const targetNode = nodes.find((n) => n.id === targetId);
 
-  if (!sourceNode || !targetNode) return null;
+  if (!targetNode) return null;
 
-  // Inbound sources of Node A (excluding self-loops)
-  const sourceInbounds = edges.filter((e) => e.target === sourceId && e.source !== sourceId && e.id !== edgeId);
-  // Outbound targets of Node B (excluding self-loops)
-  const targetOutbounds = edges.filter((e) => e.source === targetId && e.target !== targetId && e.id !== edgeId);
-
-  const handleToggleSource = (inboundId: string) => {
-    setSourceRoutes((prev) => ({
-      ...prev,
-      [inboundId]: !prev[inboundId],
-    }));
-  };
+  // Inbound connections to Target Node B
+  const targetInbounds = edges.filter((e) => e.target === targetId);
+  // Outbound connections from Target Node B (excluding self loops)
+  const targetOutbounds = edges.filter((e) => e.source === targetId && e.target !== targetId);
 
   const handleToggleTarget = (outboundId: string) => {
-    setTargetRoutes((prev) => ({
-      ...prev,
-      [outboundId]: !prev[outboundId],
-    }));
+    setLocalRoutingTable((prev) => {
+      const row = prev[selectedInboundId] || {};
+      return {
+        ...prev,
+        [selectedInboundId]: {
+          ...row,
+          [outboundId]: !row[outboundId],
+        },
+      };
+    });
   };
 
   const handleSave = () => {
-    saveConnectionRouting(sourceId, targetId, edgeId, sourceRoutes, targetRoutes);
+    updateNodeData(targetId, { routingTable: localRoutingTable });
+    setRoutingModal(null);
   };
 
   return (
@@ -146,10 +126,10 @@ export default function RoutingModal() {
             </div>
             <div>
               <h3 className="font-bold text-sm text-slate-100 tracking-wide uppercase m-0">
-                Connection Configurator
+                Routing Path Configurator
               </h3>
               <p className="text-[10px] text-slate-500 font-mono m-0 mt-0.5">
-                New Edge: {edgeId.substring(0, 12)}
+                Node: {targetNode.data.label}
               </p>
             </div>
           </div>
@@ -161,108 +141,67 @@ export default function RoutingModal() {
           </button>
         </div>
 
-        {/* Info Visualizer */}
-        <div className="flex items-center justify-center gap-3 bg-slate-950/50 border border-slate-800/80 rounded-xl p-3 text-xs">
-          <div className="text-center flex-1">
-            <span className="text-[9px] uppercase font-mono text-slate-500 block mb-0.5">Source Node</span>
-            <span className="font-semibold text-slate-200">{sourceNode.data.label}</span>
-          </div>
-          <ArrowRight size={16} className="text-indigo-400 animate-pulse" />
-          <div className="text-center flex-1">
-            <span className="text-[9px] uppercase font-mono text-slate-500 block mb-0.5">Target Node</span>
-            <span className="font-semibold text-slate-200">{targetNode.data.label}</span>
-          </div>
-        </div>
-
         {/* Content */}
         <div className="space-y-4 max-h-[300px] overflow-y-auto pr-1 scrollbar-thin">
-          {/* Source node routing */}
-          <div className="space-y-2">
-            <h4 className="text-xs font-bold text-slate-300 flex items-center gap-1">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
-              Source Routing: Inbound to New Edge
-            </h4>
-            <p className="text-[10px] text-slate-500 leading-normal m-0 pl-2.5">
-              Select which message sources entering {sourceNode.data.label} are allowed to trigger transmissions onto this new connection:
-            </p>
-            <div className="space-y-1.5 pl-2.5 mt-1">
-              {sourceNode.data.isTrigger && (
-                <div
-                  onClick={() => handleToggleSource('trigger')}
-                  className={`flex items-center justify-between p-2 rounded-lg border text-xs cursor-pointer transition-all duration-200 ${
-                    sourceRoutes['trigger']
-                      ? 'bg-emerald-950/20 border-emerald-500/30 text-emerald-300'
-                      : 'bg-slate-950/40 border-slate-800 text-slate-400 hover:border-slate-700'
-                  }`}
-                >
-                  <span>Initial Trigger</span>
-                  <div className={`h-4.5 w-4.5 rounded border flex items-center justify-center transition-colors ${
-                    sourceRoutes['trigger'] ? 'bg-emerald-600 border-emerald-500' : 'border-slate-800'
-                  }`}>
-                    {sourceRoutes['trigger'] && <Check size={10} className="text-white" />}
-                  </div>
-                </div>
-              )}
-              {sourceInbounds.map((edge) => {
-                const src = nodes.find((n) => n.id === edge.source);
-                const srcName = src ? src.data.label : 'Unknown';
-                const proto = edge.data?.connectionType?.toUpperCase() || 'REST';
-                const isSelected = !!sourceRoutes[edge.id];
-                return (
-                  <div
-                    key={edge.id}
-                    onClick={() => handleToggleSource(edge.id)}
-                    className={`flex items-center justify-between p-2 rounded-lg border text-xs cursor-pointer transition-all duration-200 ${
-                      isSelected
-                        ? 'bg-emerald-950/20 border-emerald-500/30 text-emerald-300'
-                        : 'bg-slate-950/40 border-slate-800 text-slate-400 hover:border-slate-700'
-                    }`}
-                  >
-                    <span>Inbound from {srcName} ({proto})</span>
-                    <div className={`h-4.5 w-4.5 rounded border flex items-center justify-center transition-colors ${
-                      isSelected ? 'bg-emerald-600 border-emerald-500' : 'border-slate-800'
-                    }`}>
-                      {isSelected && <Check size={10} className="text-white" />}
-                    </div>
-                  </div>
-                );
-              })}
-              {!sourceNode.data.isTrigger && sourceInbounds.length === 0 && (
-                <div className="text-[10px] text-slate-500 italic p-2 border border-dashed border-slate-800/40 rounded-lg bg-slate-950/20">
-                  No incoming paths to trigger this service.
-                </div>
-              )}
+          {/* Dropdown for Inbound Source Selection */}
+          <div className="space-y-1.5">
+            <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
+              Inbound Connection (Input Source)
+            </label>
+            <div className="relative">
+              <select
+                value={selectedInboundId}
+                onChange={(e) => setSelectedInboundId(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3.5 py-2 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 cursor-pointer appearance-none"
+              >
+                {targetInbounds.map((inbound) => {
+                  const src = nodes.find((n) => n.id === inbound.source);
+                  const srcName = src ? src.data.label : 'Unknown';
+                  const proto = inbound.data?.connectionType?.toUpperCase() || 'REST';
+                  return (
+                    <option key={inbound.id} value={inbound.id} className="bg-slate-950">
+                      {srcName} ({proto})
+                    </option>
+                  );
+                })}
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3.5 text-slate-400">
+                <svg className="fill-current h-3 w-3" viewBox="0 0 20 20">
+                  <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
+                </svg>
+              </div>
             </div>
           </div>
 
-          {/* Target node routing */}
+          {/* Outbound Checkboxes Checklist */}
           <div className="space-y-2 pt-2 border-t border-slate-800/60">
             <h4 className="text-xs font-bold text-slate-300 flex items-center gap-1">
-              <span className="h-1.5 w-1.5 rounded-full bg-blue-400"></span>
-              Target Routing: New Edge to Outbound
+              <span className="h-1.5 w-1.5 rounded-full bg-indigo-400"></span>
+              Outbound Checkbox Checklist
             </h4>
             <p className="text-[10px] text-slate-500 leading-normal m-0 pl-2.5">
-              Select which outbound destinations from {targetNode.data.label} can be reached when messages arrive from this new connection:
+              Select which outbound destinations from {targetNode.data.label} are active when messages arrive from this input:
             </p>
             <div className="space-y-1.5 pl-2.5 mt-1">
               {targetOutbounds.map((edge) => {
                 const tgt = nodes.find((n) => n.id === edge.target);
                 const tgtName = tgt ? tgt.data.label : 'Unknown';
                 const proto = edge.data?.connectionType?.toUpperCase() || 'REST';
-                const isSelected = !!targetRoutes[edge.id];
+                const isSelected = !!localRoutingTable[selectedInboundId]?.[edge.id];
+                
                 return (
                   <div
                     key={edge.id}
                     onClick={() => handleToggleTarget(edge.id)}
                     className={`flex items-center justify-between p-2 rounded-lg border text-xs cursor-pointer transition-all duration-200 ${
                       isSelected
-                        ? 'bg-blue-950/20 border-blue-500/30 text-blue-300'
+                        ? 'bg-indigo-950/20 border-indigo-500/30 text-indigo-300'
                         : 'bg-slate-950/40 border-slate-800 text-slate-400 hover:border-slate-700'
                     }`}
                   >
                     <span>Outbound to {tgtName} ({proto})</span>
                     <div className={`h-4.5 w-4.5 rounded border flex items-center justify-center transition-colors ${
-                      isSelected ? 'bg-blue-600 border-blue-500' : 'border-slate-800'
+                      isSelected ? 'bg-indigo-600 border-indigo-500' : 'border-slate-800'
                     }`}>
                       {isSelected && <Check size={10} className="text-white" />}
                     </div>
@@ -271,7 +210,7 @@ export default function RoutingModal() {
               })}
               {targetOutbounds.length === 0 && (
                 <div className="text-[10px] text-slate-500 italic p-2 border border-dashed border-slate-800/40 rounded-lg bg-slate-950/20">
-                  No outgoing paths from this target.
+                  No outgoing paths from this node.
                 </div>
               )}
             </div>
@@ -284,7 +223,7 @@ export default function RoutingModal() {
             onClick={() => setRoutingModal(null)}
             className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-950 border border-slate-800 hover:border-slate-700 hover:bg-slate-900 transition-all cursor-pointer"
           >
-            Cancel (Block Paths)
+            Close
           </button>
           <button
             onClick={handleSave}
