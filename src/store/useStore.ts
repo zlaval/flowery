@@ -542,15 +542,26 @@ export const useStore = create<AppState>((set, get) => {
         return node;
       }) as AppNode[];
 
+      const sourceNode = get().nodes.find((n) => n.id === connection.source);
+      const sourceInbounds = get().edges.filter((e) => e.target === connection.source && e.source !== connection.source);
+      const hasSourceOptions = !!(sourceNode?.data.isTrigger || sourceInbounds.length > 0);
+
+      const targetOutbounds = get().edges.filter((e) => e.source === connection.target && e.target !== connection.target);
+      const hasTargetOptions = targetOutbounds.length > 0;
+
+      const hasRoutingOptions = hasSourceOptions || hasTargetOptions;
+
       set({
         edges: [...get().edges, newEdge],
         nodes: updatedNodes,
-        routingModal: {
-          isOpen: true,
-          edgeId,
-          sourceId: connection.source,
-          targetId: connection.target,
-        },
+        routingModal: hasRoutingOptions
+          ? {
+              isOpen: true,
+              edgeId,
+              sourceId: connection.source,
+              targetId: connection.target,
+            }
+          : null,
       });
     },
 

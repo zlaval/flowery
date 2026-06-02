@@ -159,52 +159,40 @@ const CustomEdge = ({
         </>
       )}
 
-      {/* Connection Protocol Badge & Conditions */}
-      <EdgeLabelRenderer>
-        <div
-          style={{
-            position: 'absolute',
-            transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
-            pointerEvents: 'all',
-          }}
-          className="nodrag nopan flex flex-col items-center gap-1.5"
-        >
-          {/* Protocol Badge */}
-          <button
-            onClick={handleSelect}
-            className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-slate-950/95 border transition-all duration-200 shadow-lg cursor-pointer ${
-              isFailed
-                ? 'border-red-500/80 text-red-400 ring-2 ring-red-500/10'
-                : selected
-                ? 'border-indigo-500 text-indigo-400 ring-2 ring-indigo-500/20'
-                : 'border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
-            }`}
+      {/* Connection Protocol Conditions & Warning Badges */}
+      {(edgeData?.routingCondition?.trim() || isFailed) && (
+        <EdgeLabelRenderer>
+          <div
+            style={{
+              position: 'absolute',
+              transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
+              pointerEvents: 'all',
+            }}
+            className="nodrag nopan flex flex-col items-center gap-1.5"
           >
-            {config.label}
-          </button>
+            {/* Routing Condition Tag */}
+            {edgeData?.routingCondition?.trim() && (
+              <span
+                className={`px-1.5 py-0.5 rounded border text-[8px] font-mono font-semibold shadow-md whitespace-nowrap ${
+                  isFailed
+                    ? 'bg-red-950/90 border-red-500/30 text-red-300'
+                    : 'bg-slate-950/90 border-slate-800 text-indigo-300'
+                }`}
+              >
+                IF: {edgeData.routingCondition}
+              </span>
+            )}
 
-          {/* Routing Condition Tag */}
-          {edgeData?.routingCondition?.trim() && (
-            <span
-              className={`px-1.5 py-0.5 rounded border text-[8px] font-mono font-semibold shadow-md whitespace-nowrap ${
-                isFailed
-                  ? 'bg-red-950/90 border-red-500/30 text-red-300'
-                  : 'bg-slate-950/90 border-slate-800 text-indigo-300'
-              }`}
-            >
-              IF: {edgeData.routingCondition}
-            </span>
-          )}
-
-          {/* Blocked Path Warning Badge */}
-          {isFailed && (
-            <span className="flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[8px] font-bold bg-red-950 text-red-300 border border-red-500/30 animate-bounce">
-              <AlertTriangle size={8} className="fill-red-400 text-red-950" />
-              Blocked
-            </span>
-          )}
-        </div>
-      </EdgeLabelRenderer>
+            {/* Blocked Path Warning Badge */}
+            {isFailed && (
+              <span className="flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[8px] font-bold bg-red-950 text-red-300 border border-red-500/30 animate-bounce">
+                <AlertTriangle size={8} className="fill-red-400 text-red-950" />
+                Blocked
+              </span>
+            )}
+          </div>
+        </EdgeLabelRenderer>
+      )}
     </>
   );
 };
