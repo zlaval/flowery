@@ -1,5 +1,5 @@
-import { memo } from 'react';
-import { Handle, Position } from '@xyflow/react';
+import { memo, useEffect } from 'react';
+import { Handle, Position, useUpdateNodeInternals } from '@xyflow/react';
 import type { NodeProps } from '@xyflow/react';
 import { Server, Database, MessageSquare, Flame, Play, Code2 } from 'lucide-react';
 import { useStore } from '../store/useStore';
@@ -79,6 +79,12 @@ const CustomNode = ({ id, data, selected }: NodeProps<any>) => {
     nodeData.type === 'start' ? ['output'] : ['input', 'output']
   );
 
+  const updateNodeInternals = useUpdateNodeInternals();
+
+  useEffect(() => {
+    updateNodeInternals(id);
+  }, [id, JSON.stringify(activeHandles), updateNodeInternals]);
+
   // Left side spacing
   const showInputLeft = activeHandles.includes('input');
   const showOutputLeft = activeHandles.includes('output-left');
@@ -106,6 +112,10 @@ const CustomNode = ({ id, data, selected }: NodeProps<any>) => {
       setMode('simulation');
       startSimulation();
     }
+  };
+
+  const preventPropagation = (e: React.SyntheticEvent) => {
+    e.stopPropagation();
   };
 
   return (
@@ -213,6 +223,9 @@ const CustomNode = ({ id, data, selected }: NodeProps<any>) => {
           {nodeData.type === 'start' && mode === 'edit' ? (
             <button
               onClick={handleStartClick}
+              onMouseDown={preventPropagation}
+              onPointerDown={preventPropagation}
+              onDoubleClick={preventPropagation}
               title="Run Simulation"
               className={`rounded-lg p-1.5 transition-all duration-200 cursor-pointer ${config.bgClass} ${config.colorClass} hover:bg-indigo-600 hover:text-white hover:scale-110 active:scale-95`}
             >
