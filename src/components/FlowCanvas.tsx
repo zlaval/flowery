@@ -28,6 +28,7 @@ interface MenuState {
   x: number;
   y: number;
   nodeId?: string;
+  edgeId?: string;
 }
 
 export default function FlowCanvas() {
@@ -42,6 +43,7 @@ export default function FlowCanvas() {
     addNode,
     duplicateNode,
     deleteNode,
+    deleteEdge,
     setTriggerNode,
     setRenameModal,
   } = useStore();
@@ -104,6 +106,19 @@ export default function FlowCanvas() {
     [setMenu]
   );
 
+  const onEdgeContextMenu = useCallback(
+    (event: any, edge: any) => {
+      event.preventDefault();
+      setMenu({
+        visible: true,
+        x: event.clientX,
+        y: event.clientY,
+        edgeId: edge.id,
+      });
+    },
+    [setMenu]
+  );
+
   // Close context menu on any standard click outside
   useEffect(() => {
     const handleCloseMenu = () => {
@@ -132,6 +147,7 @@ export default function FlowCanvas() {
         onEdgeClick={handleEdgeClick}
         onPaneClick={handlePaneClick}
         onNodeContextMenu={onNodeContextMenu}
+        onEdgeContextMenu={onEdgeContextMenu}
         onPaneContextMenu={onPaneContextMenu}
         // Restrict modifications during simulation mode
         nodesDraggable={mode === 'edit'}
@@ -208,6 +224,23 @@ export default function FlowCanvas() {
                     Delete Node
                   </button>
                 </>
+              )}
+            </div>
+          ) : menu.edgeId ? (
+            // Edge Context Options
+            <div className="space-y-0.5">
+              {mode === 'edit' ? (
+                <button
+                  onClick={() => deleteEdge(menu.edgeId!)}
+                  className="w-full text-left px-3 py-2 text-xs font-semibold text-red-400 hover:text-white hover:bg-red-600 rounded-lg flex items-center gap-2 cursor-pointer transition-colors animate-pulse"
+                >
+                  <Trash2 size={13} />
+                  Delete Connection
+                </button>
+              ) : (
+                <div className="px-3 py-1.5 text-slate-500 text-[10px] font-mono">
+                  Simulation Active (Locked)
+                </div>
               )}
             </div>
           ) : (
