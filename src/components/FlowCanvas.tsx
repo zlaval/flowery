@@ -12,7 +12,7 @@ import '@xyflow/react/dist/style.css';
 import { useStore } from '../store/useStore';
 import CustomNode from './CustomNode';
 import CustomEdge from './CustomEdge';
-import { Server, Database, MessageSquare, Copy, Trash2, Flame } from 'lucide-react';
+import { Server, Database, MessageSquare, Copy, Trash2, Flame, Code2 } from 'lucide-react';
 
 // Register custom nodes and edges
 const nodeTypes = {
@@ -145,6 +145,8 @@ export default function FlowCanvas() {
                 return '#a855f7'; // purple-500
               case 'api':
                 return '#f59e0b'; // amber-500
+              case 'function':
+                return '#ec4899'; // pink-500
               default:
                 return '#64748b'; // slate-500
             }
@@ -218,6 +220,13 @@ export default function FlowCanvas() {
                   >
                     <MessageSquare size={13} className="text-purple-400" />
                     Add Queue
+                  </button>
+                  <button
+                    onClick={() => addNode('function')}
+                    className="w-full text-left px-3 py-2 text-xs font-semibold text-slate-300 hover:text-white hover:bg-indigo-600 rounded-lg flex items-center gap-2 cursor-pointer transition-colors"
+                  >
+                    <Code2 size={13} className="text-pink-400" />
+                    Add Function
                   </button>
                 </>
               ) : (

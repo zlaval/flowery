@@ -3,7 +3,7 @@ import { useStore } from '../store/useStore';
 import { Plus, Save, FolderOpen, Network, Edit3, Cpu, Sparkles } from 'lucide-react';
 
 export default function Navbar() {
-  const { mode, setMode, clearCanvas, nodes } = useStore();
+  const { mode, setMode, clearCanvas, nodes, edges } = useStore();
   const [toast, setToast] = useState<string | null>(null);
 
   // Auto-clear toast after 3 seconds
@@ -15,7 +15,7 @@ export default function Navbar() {
   }, [toast]);
 
   const handleNew = () => {
-    if (nodes.length === 0) return;
+    if (nodes.length <= 1 && edges.length === 0) return;
     const confirmClear = window.confirm(
       'Are you sure you want to clear the canvas? This will delete all nodes and connections.'
     );
@@ -76,9 +76,9 @@ export default function Navbar() {
       <div className="flex items-center gap-2">
         <button
           onClick={handleNew}
-          disabled={nodes.length === 0}
+          disabled={nodes.length <= 1 && edges.length === 0}
           className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-semibold border transition-all duration-200 cursor-pointer ${
-            nodes.length === 0
+            nodes.length <= 1 && edges.length === 0
               ? 'border-slate-800 text-slate-600 bg-slate-950/20 cursor-not-allowed'
               : 'border-slate-800 bg-slate-900 text-slate-300 hover:bg-slate-800 hover:border-slate-700 hover:text-white'
           }`}

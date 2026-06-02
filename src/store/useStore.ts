@@ -11,7 +11,7 @@ import type {
   Edge,
 } from '@xyflow/react';
 
-export type NodeType = 'microservice' | 'database' | 'kafka' | 'api';
+export type NodeType = 'start' | 'microservice' | 'database' | 'kafka' | 'api' | 'function';
 export type ConnectionType =
   | 'rest'
   | 'grpc'
@@ -22,6 +22,14 @@ export type ConnectionType =
   | 'udp'
   | 'kafka'
   | 'rabbitmq';
+
+export interface MessagePacket {
+  id: string;
+  locationId: string; // Node ID or Edge ID where message is located
+  locationType: 'node' | 'edge';
+  payload: string; // JSON string payload carried by this specific packet
+  sourceEdgeId: string | null; // Edge ID that delivered this packet, or 'trigger' if null
+}
 
 export interface CustomNodeData extends Record<string, unknown> {
   label: string;
@@ -34,6 +42,8 @@ export interface CustomNodeData extends Record<string, unknown> {
   dbName?: string;
   url?: string;
   responseTemplate?: string; // Optional response template JSON string
+  // routingTable: Record<inboundEdgeId | 'trigger', Record<outboundEdgeId, boolean>>
+  routingTable?: Record<string, Record<string, boolean>>;
 }
 
 export interface CustomEdgeData extends Record<string, unknown> {
@@ -66,14 +76,12 @@ interface AppState {
   
   // Simulation Engine Details
   triggerNodeId: string | null;
-  simulationActiveNodes: string[];
-  simulationActiveEdges: string[];
   simulationPhase: 'node' | 'edge';
   simulationSpeed: number; // multiplier (e.g. 1, 1.5, 2, 0.5)
   currentStep: number;
   
-  // V2 Simulation States
-  simulationActivePayloads: Record<string, string>; // mapping from Node/Edge ID to current active JSON payload
+  // V3 Simulation States
+  activeMessages: MessagePacket[]; // List of concurrent active message packets
   simulationFailedEdges: string[]; // List of edge IDs that failed condition evaluation
 
   // Graph manipulation actions
@@ -91,6 +99,7 @@ interface AppState {
   // Simulation actions
   setMode: (mode: 'edit' | 'simulation') => void;
   setTriggerNode: (nodeId: string) => void;
+  toggleRoute: (nodeId: string, inboundId: string, outboundId: string, enabled: boolean) => void; // Toggle routing table paths
   startSimulation: () => void;
   pauseSimulation: () => void;
   stopSimulation: () => void;
@@ -101,18 +110,65 @@ interface AppState {
 // Timer reference for the simulation loop
 let simulationTimer: number | null = null;
 
-// Initial state with a beautiful pre-configured microservices architecture
-const initialNodes: AppNode[] = [
+// Default start node for a clean canvas on startup and clear
+const defaultStartNode: AppNode = {
+  id: 'node-start',
+  type: 'customNode',
+  position: { x: 100, y: 150 },
+  data: {
+    label: 'Start Trigger',
+    type: 'start',
+    isTrigger: true,
+    hasMessage: false,
+    description: 'Generates the initial simulation trigger payload.',
+    responseTemplate: JSON.stringify(
+      {
+        action: "trigger"
+      },
+      null,
+      2
+    ),
+    routingTable: {}
+  }
+};
+
+// Initial state with a beautiful pre-configured multi-hop looping architecture
+export const initialNodes: AppNode[] = [
   {
-    id: 'node-order-service',
+    id: 'node-start',
     type: 'customNode',
-    position: { x: 180, y: 150 },
+    position: { x: 40, y: 150 },
     data: {
-      label: 'Order Service',
-      type: 'microservice',
+      label: 'Start Trigger',
+      type: 'start',
       isTrigger: true,
       hasMessage: false,
-      description: 'Main entry point for customer orders. Validates requests and orchestrates checkout.',
+      description: 'Generates the initial simulation trigger payload.',
+      responseTemplate: JSON.stringify(
+        {
+          action: "initialize_payment_flow",
+          timestamp: 1780336200
+        },
+        null,
+        2
+      ),
+      routingTable: {
+        'trigger': {
+          'edge-start-a': true
+        }
+      }
+    }
+  },
+  {
+    id: 'node-service-a',
+    type: 'customNode',
+    position: { x: 260, y: 150 },
+    data: {
+      label: 'Service A',
+      type: 'microservice',
+      isTrigger: false,
+      hasMessage: false,
+      description: 'Orchestrates checkouts. Saves state in DB and distributes to queues.',
       host: '10.0.1.5',
       port: '8080',
       responseTemplate: JSON.stringify(
@@ -126,92 +182,121 @@ const initialNodes: AppNode[] = [
         null,
         2
       ),
+      routingTable: {
+        'edge-start-a': {
+          'edge-a-kafka-d': true,
+          'edge-a-db': true,
+          'edge-a-kafka-k': false,
+        },
+        'edge-b-a': {
+          'edge-a-db': true,
+          'edge-a-kafka-k': true,
+          'edge-a-kafka-d': false,
+        }
+      },
     },
   },
   {
     id: 'node-order-db',
     type: 'customNode',
-    position: { x: 80, y: 350 },
+    position: { x: 260, y: 350 },
     data: {
-      label: 'Order DB',
+      label: 'Order Database',
       type: 'database',
       isTrigger: false,
       hasMessage: false,
-      description: 'PostgreSQL instance storing orders, payment metadata, and customer purchase history.',
+      description: 'PostgreSQL storing checkout orders and transaction logs.',
       dbName: 'orders_db',
       port: '5432',
+      routingTable: {},
     },
   },
   {
-    id: 'node-payment-service',
+    id: 'node-kafka-d',
     type: 'customNode',
-    position: { x: 480, y: 150 },
+    position: { x: 500, y: 40 },
     data: {
-      label: 'Payment Service',
+      label: 'Payment Queue D',
+      type: 'kafka',
+      isTrigger: false,
+      hasMessage: false,
+      description: 'Kafka topic carrying PENDING transaction events.',
+      host: 'kafka-broker-d',
+      port: '9092',
+      routingTable: {
+        'edge-a-kafka-d': {
+          'edge-kafka-d-b': true
+        }
+      },
+    },
+  },
+  {
+    id: 'node-service-b',
+    type: 'customNode',
+    position: { x: 740, y: 150 },
+    data: {
+      label: 'Service B',
       type: 'microservice',
       isTrigger: false,
       hasMessage: false,
-      description: 'Processes credit cards, handles refunds, and coordinates with external gateways.',
+      description: 'Processes gateways payments and confirms transactions.',
       host: '10.0.1.12',
       port: '8082',
       responseTemplate: JSON.stringify(
         {
           transaction_id: "tx_880192a",
-          status: "SUCCESS",
+          status: "CONFIRMED",
           gateway: "stripe"
         },
         null,
         2
       ),
+      routingTable: {
+        'edge-kafka-d-b': {
+          'edge-b-a': true,
+        }
+      },
     },
   },
   {
-    id: 'node-kafka-queue',
+    id: 'node-kafka-k',
     type: 'customNode',
-    position: { x: 780, y: 150 },
+    position: { x: 500, y: 260 },
     data: {
-      label: 'Payment Events Queue',
+      label: 'Audit Queue K',
       type: 'kafka',
       isTrigger: false,
       hasMessage: false,
-      description: 'Apache Kafka topic distributing checkout success events to inventory and notification systems.',
-      host: 'kafka-broker-1',
+      description: 'Kafka topic collecting completed checkout logs.',
+      host: 'kafka-broker-k',
       port: '9092',
-    },
-  },
-  {
-    id: 'node-stripe-api',
-    type: 'customNode',
-    position: { x: 880, y: 350 },
-    data: {
-      label: 'Stripe Gateway',
-      type: 'api',
-      isTrigger: false,
-      hasMessage: false,
-      description: 'External API client communicating with Stripe for secure payment processing.',
-      url: 'https://api.stripe.com/v3',
-    },
-  },
-  {
-    id: 'node-inventory-service',
-    type: 'customNode',
-    position: { x: 400, y: 350 },
-    data: {
-      label: 'Inventory Service',
-      type: 'microservice',
-      isTrigger: false,
-      hasMessage: false,
-      description: 'Tracks product stock levels, reserves inventory items, and alerts for restocking.',
-      host: '10.0.2.14',
-      port: '8085',
+      routingTable: {},
     },
   },
 ];
 
-const initialEdges: AppEdge[] = [
+export const initialEdges: AppEdge[] = [
   {
-    id: 'edge-order-db',
-    source: 'node-order-service',
+    id: 'edge-start-a',
+    source: 'node-start',
+    target: 'node-service-a',
+    type: 'customEdge',
+    data: {
+      connectionType: 'rest',
+      payload: JSON.stringify(
+        {
+          action: "initialize_order"
+        },
+        null,
+        2
+      ),
+      hasMessage: false,
+      description: 'Start simulation trigger call.',
+    },
+  },
+  {
+    id: 'edge-a-db',
+    source: 'node-service-a',
     target: 'node-order-db',
     type: 'customEdge',
     data: {
@@ -231,104 +316,94 @@ const initialEdges: AppEdge[] = [
         2
       ),
       hasMessage: false,
-      description: 'Persist new order details in Database.',
+      description: 'Persist checkout details in Order DB.',
     },
   },
   {
-    id: 'edge-order-payment',
-    source: 'node-order-service',
-    target: 'node-payment-service',
-    type: 'customEdge',
-    data: {
-      connectionType: 'grpc',
-      payload: JSON.stringify(
-        {
-          method: "ProcessPaymentRequest",
-          order_id: "ord_2026_x89",
-          user_id: "cust_9901",
-          amount: 249.99,
-          payment_method: "tok_visa"
-        },
-        null,
-        2
-      ),
-      hasMessage: false,
-      description: 'gRPC call to trigger payment processing.',
-      routingCondition: 'payload.status === "ACTIVE"', // Evaluates to TRUE
-    },
-  },
-  {
-    id: 'edge-order-inventory',
-    source: 'node-order-service',
-    target: 'node-inventory-service',
-    type: 'customEdge',
-    data: {
-      connectionType: 'grpc',
-      payload: JSON.stringify(
-        {
-          method: "ReserveStockRequest",
-          items: [
-            { sku: "sku-dev-board", qty: 1 }
-          ]
-        },
-        null,
-        2
-      ),
-      hasMessage: false,
-      description: 'Reserve inventory items if shipping is required.',
-      routingCondition: 'payload.requires_shipping === false', // Evaluates to FALSE (will block and flash red!)
-    },
-  },
-  {
-    id: 'edge-payment-kafka',
-    source: 'node-payment-service',
-    target: 'node-kafka-queue',
+    id: 'edge-a-kafka-d',
+    source: 'node-service-a',
+    target: 'node-kafka-d',
     type: 'customEdge',
     data: {
       connectionType: 'kafka',
       payload: JSON.stringify(
         {
-          topic: "payment-completed-events",
-          key: "ord_2026_x89",
-          partition: 0,
+          topic: "checkout-pending",
           value: {
-            transaction_id: "tx_880192a",
             order_id: "ord_2026_x89",
-            status: "SUCCESS",
-            timestamp: 1780336214
+            amount: 249.99
           }
         },
         null,
         2
       ),
       hasMessage: false,
-      description: 'Publish payment completion event to Kafka.',
+      description: 'Publish checkout details to Queue D.',
     },
   },
   {
-    id: 'edge-kafka-stripe',
-    source: 'node-kafka-queue',
-    target: 'node-stripe-api',
+    id: 'edge-kafka-d-b',
+    source: 'node-kafka-d',
+    target: 'node-service-b',
     type: 'customEdge',
     data: {
-      connectionType: 'rest',
+      connectionType: 'kafka',
       payload: JSON.stringify(
         {
-          url: "/v1/charges",
-          method: "POST",
-          headers: { Authorization: "Bearer sk_test_..." },
-          body: {
-            amount: 24999,
-            currency: "usd",
-            source: "tok_visa",
-            description: "Charge for order ord_2026_x89"
+          topic: "checkout-pending",
+          value: {
+            order_id: "ord_2026_x89",
+            amount: 249.99
           }
         },
         null,
         2
       ),
       hasMessage: false,
-      description: 'Relay charge event to external Stripe API gateway.',
+      description: 'Route pending checkout to Service B.',
+    },
+  },
+  {
+    id: 'edge-b-a',
+    source: 'node-service-b',
+    target: 'node-service-a',
+    type: 'customEdge',
+    data: {
+      connectionType: 'grpc',
+      payload: JSON.stringify(
+        {
+          method: "PaymentConfirmedNotification",
+          order_id: "ord_2026_x89",
+          tx_id: "tx_880192a"
+        },
+        null,
+        2
+      ),
+      hasMessage: false,
+      description: 'Confirm payment to Service A.',
+    },
+  },
+  {
+    id: 'edge-a-kafka-k',
+    source: 'node-service-a',
+    target: 'node-kafka-k',
+    type: 'customEdge',
+    data: {
+      connectionType: 'kafka',
+      payload: JSON.stringify(
+        {
+          topic: "audit-events",
+          value: {
+            order_id: "ord_2026_x89",
+            status: "SUCCESS"
+          }
+        },
+        null,
+        2
+      ),
+      hasMessage: false,
+      description: 'Publish completed transaction audit to Queue K.',
+      routingCondition: 'payload.status === "CONFIRMED"',
     },
   },
 ];
@@ -355,19 +430,17 @@ export const useStore = create<AppState>((set, get) => {
 
   return {
     // Initial data
-    nodes: initialNodes,
-    edges: initialEdges,
+    nodes: [defaultStartNode],
+    edges: [],
     mode: 'edit',
     status: 'stopped',
     selectedElement: null,
     
-    triggerNodeId: 'node-order-service',
-    simulationActiveNodes: [],
-    simulationActiveEdges: [],
+    triggerNodeId: 'node-start',
     simulationPhase: 'node',
     simulationSpeed: 1,
     currentStep: 0,
-    simulationActivePayloads: {},
+    activeMessages: [],
     simulationFailedEdges: [],
 
     // Flow handlers
@@ -401,8 +474,45 @@ export const useStore = create<AppState>((set, get) => {
         },
       };
 
+      // V3 Refinement: Dynamically update source node routingTable, default to true
+      const updatedNodes = get().nodes.map((node) => {
+        if (node.id === connection.source) {
+          const routingTable = { ...node.data.routingTable };
+          
+          // Append new Edge ID to all existing inbound connection keys in the table
+          const keys = Object.keys(routingTable);
+          if (keys.length === 0) {
+            routingTable['trigger'] = { [edgeId]: true };
+          } else {
+            keys.forEach((key) => {
+              routingTable[key] = {
+                ...routingTable[key],
+                [edgeId]: true,
+              };
+            });
+          }
+
+          return {
+            ...node,
+            data: { ...node.data, routingTable },
+          };
+        } else if (node.id === connection.target) {
+          // Initialize routing table mapping row for the target node receiving edgeId
+          const routingTable = { ...node.data.routingTable };
+          if (!routingTable[edgeId]) {
+            routingTable[edgeId] = {};
+          }
+          return {
+            ...node,
+            data: { ...node.data, routingTable },
+          };
+        }
+        return node;
+      }) as AppNode[];
+
       set({
         edges: [...get().edges, newEdge],
+        nodes: updatedNodes,
       });
     },
 
@@ -412,17 +522,21 @@ export const useStore = create<AppState>((set, get) => {
       const viewportCenter = { x: 300 + Math.random() * 80, y: 200 + Math.random() * 80 };
       
       const labels: Record<NodeType, string> = {
+        start: 'Start Node',
         microservice: 'New Service',
         database: 'New Database',
         kafka: 'Kafka Queue',
         api: 'External API',
+        function: 'Function',
       };
 
       const defaultData: Record<NodeType, Partial<CustomNodeData>> = {
-        microservice: { host: '127.0.0.1', port: '8080', description: 'Custom Microservice API endpoint.', responseTemplate: '' },
-        database: { dbName: 'postgres', port: '5432', description: 'Relational Database Instance.', responseTemplate: '' },
-        kafka: { host: 'localhost', port: '9092', description: 'Kafka Stream / Topic.', responseTemplate: '' },
-        api: { url: 'https://api.example.com/v1', description: 'External third-party API provider.', responseTemplate: '' },
+        start: { responseTemplate: '{\n  "action": "trigger"\n}', routingTable: {} },
+        microservice: { description: 'Custom Microservice API endpoint.', responseTemplate: '', routingTable: {} },
+        database: { description: 'Relational Database Instance.', responseTemplate: '', routingTable: {} },
+        kafka: { description: 'Kafka Stream / Topic.', responseTemplate: '', routingTable: {} },
+        api: { url: 'https://api.example.com/v1', description: 'External third-party API provider.', responseTemplate: '', routingTable: {} },
+        function: { description: 'Serverless Function.', responseTemplate: '', routingTable: {} },
       };
 
       const isFirstNode = get().nodes.length === 0;
@@ -452,6 +566,8 @@ export const useStore = create<AppState>((set, get) => {
 
       const newId = `node-${node.data.type}-${Date.now()}`;
       const offset = 40;
+      
+      // Duplicated nodes start fresh with empty routing tables (connections not cloned)
       const newNode: AppNode = {
         ...node,
         id: newId,
@@ -461,6 +577,7 @@ export const useStore = create<AppState>((set, get) => {
           ...node.data,
           isTrigger: false,
           hasMessage: false,
+          routingTable: {},
         },
       };
 
@@ -525,8 +642,38 @@ export const useStore = create<AppState>((set, get) => {
     },
 
     deleteEdge: (id) => {
+      // V3 Refinement: Clean deleted edge ID from inbound rows and outbound mappings of all nodes
+      const updatedNodes = get().nodes.map((node) => {
+        const routingTable = { ...node.data.routingTable };
+        let modified = false;
+
+        // Delete inbound row mapping
+        if (id in routingTable) {
+          delete routingTable[id];
+          modified = true;
+        }
+
+        // Delete from checkbox selections inside other inbound mappings
+        Object.keys(routingTable).forEach((key) => {
+          if (routingTable[key] && id in routingTable[key]) {
+            routingTable[key] = { ...routingTable[key] };
+            delete routingTable[key][id];
+            modified = true;
+          }
+        });
+
+        if (modified) {
+          return {
+            ...node,
+            data: { ...node.data, routingTable },
+          };
+        }
+        return node;
+      }) as AppNode[];
+
       set({
         edges: get().edges.filter((edge) => edge.id !== id),
+        nodes: updatedNodes,
         selectedElement: get().selectedElement?.id === id ? null : get().selectedElement,
       });
     },
@@ -534,17 +681,15 @@ export const useStore = create<AppState>((set, get) => {
     clearCanvas: () => {
       stopInterval();
       set({
-        nodes: [],
+        nodes: [defaultStartNode],
         edges: [],
         selectedElement: null,
-        triggerNodeId: null,
+        triggerNodeId: 'node-start',
         status: 'stopped',
         mode: 'edit',
-        simulationActiveNodes: [],
-        simulationActiveEdges: [],
         simulationPhase: 'node',
         currentStep: 0,
-        simulationActivePayloads: {},
+        activeMessages: [],
         simulationFailedEdges: [],
       });
     },
@@ -571,13 +716,11 @@ export const useStore = create<AppState>((set, get) => {
         set({
           mode,
           status: 'stopped',
-          simulationActiveNodes: [],
-          simulationActiveEdges: [],
           simulationPhase: 'node',
           currentStep: 0,
           nodes: resetNodes,
           edges: resetEdges,
-          simulationActivePayloads: {},
+          activeMessages: [],
           simulationFailedEdges: [],
         });
       } else {
@@ -602,21 +745,25 @@ export const useStore = create<AppState>((set, get) => {
           data: { ...edge.data, hasMessage: false },
         })) as AppEdge[];
 
-        const activePayloads: Record<string, string> = {};
+        const activeMessagesList: MessagePacket[] = [];
         if (triggerId) {
-          activePayloads[triggerId] = initialPayload;
+          activeMessagesList.push({
+            id: `msg-start-${Date.now()}`,
+            locationId: triggerId,
+            locationType: 'node',
+            payload: initialPayload,
+            sourceEdgeId: null, // trigger source is null
+          });
         }
 
         set({
           mode,
           status: 'paused',
-          simulationActiveNodes: triggerId ? [triggerId] : [],
-          simulationActiveEdges: [],
           simulationPhase: 'node',
           currentStep: 0,
           nodes: resetNodes,
           edges: resetEdges,
-          simulationActivePayloads: activePayloads,
+          activeMessages: activeMessagesList,
           simulationFailedEdges: [],
         });
       }
@@ -635,26 +782,51 @@ export const useStore = create<AppState>((set, get) => {
       });
     },
 
+    toggleRoute: (nodeId, inboundId, outboundId, enabled) => {
+      set({
+        nodes: get().nodes.map((node) => {
+          if (node.id === nodeId) {
+            const routingTable = { ...node.data.routingTable };
+            if (!routingTable[inboundId]) {
+              routingTable[inboundId] = {};
+            }
+            routingTable[inboundId] = {
+              ...routingTable[inboundId],
+              [outboundId]: enabled,
+            };
+            return {
+              ...node,
+              data: { ...node.data, routingTable },
+            };
+          }
+          return node;
+        }) as AppNode[],
+      });
+    },
+
     startSimulation: () => {
       const { triggerNodeId, nodes } = get();
       
       // If we are starting from scratch and have no active nodes/edges, reset to trigger point
-      if (get().simulationActiveNodes.length === 0 && get().simulationActiveEdges.length === 0) {
+      if (get().activeMessages.length === 0) {
         if (!triggerNodeId) return;
         const triggerNode = nodes.find(n => n.id === triggerNodeId);
         const initialPayload = triggerNode?.data.responseTemplate?.trim()
           ? triggerNode.data.responseTemplate
           : JSON.stringify({ message: "Simulation started" }, null, 2);
 
-        const activePayloads: Record<string, string> = {};
-        activePayloads[triggerNodeId] = initialPayload;
+        const initialPacketList: MessagePacket[] = [{
+          id: `msg-start-${Date.now()}`,
+          locationId: triggerNodeId,
+          locationType: 'node',
+          payload: initialPayload,
+          sourceEdgeId: null,
+        }];
 
         set({
-          simulationActiveNodes: [triggerNodeId],
-          simulationActiveEdges: [],
           simulationPhase: 'node',
           currentStep: 0,
-          simulationActivePayloads: activePayloads,
+          activeMessages: initialPacketList,
           simulationFailedEdges: [],
           nodes: nodes.map((node) => ({
             ...node,
@@ -681,11 +853,9 @@ export const useStore = create<AppState>((set, get) => {
       set({
         status: 'stopped',
         mode: 'edit',
-        simulationActiveNodes: [],
-        simulationActiveEdges: [],
         simulationPhase: 'node',
         currentStep: 0,
-        simulationActivePayloads: {},
+        activeMessages: [],
         simulationFailedEdges: [],
         nodes: get().nodes.map((node) => ({
           ...node,
@@ -701,33 +871,36 @@ export const useStore = create<AppState>((set, get) => {
     stepSimulation: () => {
       const {
         status,
-        simulationActiveNodes,
-        simulationActiveEdges,
+        activeMessages,
         simulationPhase,
         edges,
         nodes,
-        simulationActivePayloads,
       } = get();
 
       // Can step in paused or running status, but not when stopped
       if (status === 'stopped') return;
 
-      let nextActiveNodes: string[] = [];
-      let nextActiveEdges: string[] = [];
+      let nextActiveMessages: MessagePacket[] = [];
       let nextPhase: 'node' | 'edge' = simulationPhase;
-      const nextActivePayloads: Record<string, string> = { ...simulationActivePayloads };
       const newFailedEdges: string[] = [];
 
       if (simulationPhase === 'node') {
-        if (simulationActiveNodes.length === 0) {
-          // Reset to trigger point if everything goes dead
+        const activeNodePackets = activeMessages.filter(m => m.locationType === 'node');
+
+        if (activeNodePackets.length === 0) {
+          // Reset to trigger point if empty
           const trigger = get().triggerNodeId;
           if (trigger) {
             const triggerNode = nodes.find(n => n.id === trigger);
-            nextActiveNodes = [trigger];
-            nextActivePayloads[trigger] = triggerNode?.data.responseTemplate?.trim()
-              ? triggerNode.data.responseTemplate
-              : JSON.stringify({ message: "Simulation started" }, null, 2);
+            nextActiveMessages = [{
+              id: `msg-start-${Date.now()}`,
+              locationId: trigger,
+              locationType: 'node',
+              payload: triggerNode?.data.responseTemplate?.trim()
+                ? triggerNode.data.responseTemplate
+                : JSON.stringify({ message: "Simulation started" }, null, 2),
+              sourceEdgeId: null,
+            }];
             nextPhase = 'node';
           } else {
             stopInterval();
@@ -735,22 +908,30 @@ export const useStore = create<AppState>((set, get) => {
             return;
           }
         } else {
-          // Find outgoing edges from active nodes
-          const outgoingEdges = edges.filter((e) =>
-            simulationActiveNodes.includes(e.source)
-          );
+          // Loop through active packets on nodes and propagate concurrently
+          activeNodePackets.forEach((packet) => {
+            const sourceNodeId = packet.locationId;
+            const sourceNode = nodes.find(n => n.id === sourceNodeId);
+            
+            // Outgoing edges
+            const outgoingEdges = edges.filter(e => e.source === sourceNodeId);
 
-          if (outgoingEdges.length > 0) {
-            // Process payloads and conditions for each outgoing edge
             outgoingEdges.forEach((edge) => {
-              const sourceNode = nodes.find(n => n.id === edge.source);
-              let activePayload = simulationActivePayloads[edge.source] || edge.data?.payload || '{}';
+              // Resolve inbound key: source connection ID or 'trigger'
+              const inboundKey = packet.sourceEdgeId || 'trigger';
 
-              // If node has response template, mutate or override payload
+              // Opt-out check: check specific nested routingTable cell, default to true
+              const isPathAllowed = sourceNode?.data.routingTable?.[inboundKey]?.[edge.id] !== false;
+              if (!isPathAllowed) {
+                // Ignore completely - opt out
+                return;
+              }
+
+              // Determine payload (mutate if responseTemplate exists)
+              let activePayload = packet.payload || edge.data?.payload || '{}';
               if (sourceNode?.data.responseTemplate?.trim()) {
                 const template = sourceNode.data.responseTemplate.trim();
                 try {
-                  // Merge if both are JSON objects, else override
                   const incomingObj = JSON.parse(activePayload);
                   const templateObj = JSON.parse(template);
                   if (
@@ -789,116 +970,128 @@ export const useStore = create<AppState>((set, get) => {
                   `);
                   conditionPassed = !!evalFn(parsedPayload);
                 } catch (err) {
-                  console.error(`Condition syntax error on edge ${edge.id}:`, err);
+                  console.error(`Condition evaluation syntax error on edge ${edge.id}:`, err);
                   conditionPassed = false;
                 }
               }
 
               if (conditionPassed) {
-                nextActiveEdges.push(edge.id);
-                nextActivePayloads[edge.id] = activePayload;
+                nextActiveMessages.push({
+                  id: `msg-${edge.id}-${Date.now()}-${Math.random()}`,
+                  locationId: edge.id,
+                  locationType: 'edge',
+                  payload: activePayload,
+                  sourceEdgeId: edge.id,
+                });
               } else {
                 newFailedEdges.push(edge.id);
               }
             });
+          });
 
-            // If there are valid paths, transition to edge phase. Otherwise, pause flow.
-            if (nextActiveEdges.length > 0) {
-              nextActiveNodes = [];
-              nextPhase = 'edge';
-            } else {
-              // All paths are blocked
-              stopInterval();
-              
-              const updatedNodes = nodes.map((node) => ({
-                ...node,
-                data: {
-                  ...node.data,
-                  hasMessage: false,
-                },
-              })) as AppNode[];
-
-              const updatedEdges = edges.map((edge) => ({
-                ...edge,
-                data: {
-                  ...edge.data,
-                  hasMessage: false,
-                },
-              })) as AppEdge[];
-
-              set({
-                status: 'paused',
-                nodes: updatedNodes,
-                edges: updatedEdges,
-                simulationActiveNodes: [],
-                simulationActiveEdges: [],
-                simulationFailedEdges: newFailedEdges,
-              });
-              return;
-            }
+          // Transition phase
+          if (nextActiveMessages.length > 0) {
+            nextPhase = 'edge';
           } else {
-            // Flow has reached sink nodes, stop simulation automatically
+            // All paths are blocked
             stopInterval();
-            set({ status: 'paused' });
+            
+            const updatedNodes = nodes.map((node) => ({
+              ...node,
+              data: { ...node.data, hasMessage: false },
+            })) as AppNode[];
+
+            const updatedEdges = edges.map((edge) => ({
+              ...edge,
+              data: { ...edge.data, hasMessage: false },
+            })) as AppEdge[];
+
             set({
-              simulationActiveNodes: [],
-              simulationActiveEdges: [],
-              nodes: nodes.map(n => ({ ...n, data: { ...n.data, hasMessage: false } })) as AppNode[],
-              edges: edges.map(e => ({ ...e, data: { ...e.data, hasMessage: false } })) as AppEdge[],
-              simulationActivePayloads: {},
-              simulationFailedEdges: [],
+              status: 'paused',
+              nodes: updatedNodes,
+              edges: updatedEdges,
+              activeMessages: [],
+              simulationFailedEdges: newFailedEdges,
             });
             return;
           }
         }
       } else {
-        // Move from active edges to their target nodes
-        const activeEdgesList = edges.filter((e) =>
-          simulationActiveEdges.includes(e.id)
-        );
-        const targetNodes = activeEdgesList.map((e) => e.target);
-        
-        if (targetNodes.length > 0) {
-          nextActiveNodes = Array.from(new Set(targetNodes));
-          
-          // Compute payload on target nodes (merging multiple inputs if applicable)
-          nextActiveNodes.forEach((targetId) => {
-            const incoming = activeEdgesList.filter(e => e.target === targetId);
+        // simulationPhase === 'edge': We are at edges, propagating to target nodes
+        const activeEdgePackets = activeMessages.filter(m => m.locationType === 'edge');
+
+        if (activeEdgePackets.length > 0) {
+          // Group target node payloads
+          const groupedTargetPayloads: Record<string, string[]> = {};
+          activeEdgePackets.forEach((packet) => {
+            const edge = edges.find(e => e.id === packet.locationId);
+            if (edge) {
+              if (!groupedTargetPayloads[edge.target]) {
+                groupedTargetPayloads[edge.target] = [];
+              }
+              groupedTargetPayloads[edge.target].push(packet.payload);
+            }
+          });
+
+          nextActiveMessages = Object.keys(groupedTargetPayloads).map((targetId) => {
+            const payloads = groupedTargetPayloads[targetId];
             let mergedPayload = '{}';
             try {
-              const payloadsObj = incoming.map(e => {
+              const parsedObj = payloads.map((p) => {
                 try {
-                  return JSON.parse(nextActivePayloads[e.id] || '{}');
+                  return JSON.parse(p);
                 } catch {
                   return {};
                 }
               });
-              const combined = Object.assign({}, ...payloadsObj);
+              const combined = Object.assign({}, ...parsedObj);
               mergedPayload = JSON.stringify(combined, null, 2);
             } catch {
+              const incoming = edges.filter(e => e.target === targetId);
               if (incoming.length > 0) {
-                mergedPayload = nextActivePayloads[incoming[0].id] || '{}';
+                const matchingPacket = activeEdgePackets.find(p => p.locationId === incoming[0].id);
+                mergedPayload = matchingPacket?.payload || '{}';
               }
             }
-            nextActivePayloads[targetId] = mergedPayload;
+
+            // Find which connection carried the packet to this node
+            const incoming = activeEdgePackets.filter(e => {
+              const edgeDetail = edges.find(ed => ed.id === e.locationId);
+              return edgeDetail?.target === targetId;
+            });
+            const sourceEdgeId = incoming.length > 0 ? incoming[0].locationId : null;
+
+            return {
+              id: `msg-${targetId}-${Date.now()}-${Math.random()}`,
+              locationId: targetId,
+              locationType: 'node',
+              payload: mergedPayload,
+              sourceEdgeId: sourceEdgeId,
+            };
           });
 
-          nextActiveEdges = [];
           nextPhase = 'node';
         } else {
-          // Fallback
           stopInterval();
           set({ status: 'paused' });
           return;
         }
       }
 
-      // Update nodes & edges hasMessage property
+      // Update nodes & edges hasMessage property based on activeMessages locations
+      const nextActiveNodeIds = nextActiveMessages
+        .filter(m => m.locationType === 'node')
+        .map(m => m.locationId);
+      
+      const nextActiveEdgeIds = nextActiveMessages
+        .filter(m => m.locationType === 'edge')
+        .map(m => m.locationId);
+
       const updatedNodes = nodes.map((node) => ({
         ...node,
         data: {
           ...node.data,
-          hasMessage: nextActiveNodes.includes(node.id),
+          hasMessage: nextActiveNodeIds.includes(node.id),
         },
       })) as AppNode[];
 
@@ -906,19 +1099,17 @@ export const useStore = create<AppState>((set, get) => {
         ...edge,
         data: {
           ...edge.data,
-          hasMessage: nextActiveEdges.includes(edge.id),
+          hasMessage: nextActiveEdgeIds.includes(edge.id),
         },
       })) as AppEdge[];
 
       set({
         nodes: updatedNodes,
         edges: updatedEdges,
-        simulationActiveNodes: nextActiveNodes,
-        simulationActiveEdges: nextActiveEdges,
+        activeMessages: nextActiveMessages,
         simulationPhase: nextPhase,
         currentStep: get().currentStep + 1,
-        simulationActivePayloads: nextActivePayloads,
-        simulationFailedEdges: newFailedEdges, // set failed edges for current step to flash red
+        simulationFailedEdges: newFailedEdges,
       });
     },
 

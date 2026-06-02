@@ -13,6 +13,7 @@ import {
   Flame,
   Route,
   Terminal,
+  Code2,
 } from 'lucide-react';
 
 export default function Sidebar() {
@@ -28,19 +29,20 @@ export default function Sidebar() {
     triggerNodeId,
     setTriggerNode,
     mode,
-    simulationActivePayloads,
+    activeMessages,
+    toggleRoute,
   } = useStore();
 
   const [nodeLabel, setNodeLabel] = useState('');
   const [nodeDesc, setNodeDesc] = useState('');
-  const [nodeHost, setNodeHost] = useState('');
-  const [nodePort, setNodePort] = useState('');
-  const [nodeDbName, setNodeDbName] = useState('');
   const [nodeUrl, setNodeUrl] = useState('');
   
   // V2 node response template states
   const [nodeResponseTemplate, setNodeResponseTemplate] = useState('');
   const [nodeJsonError, setNodeJsonError] = useState<string | null>(null);
+
+  // V3 routing selected inbound ID state
+  const [selectedInboundId, setSelectedInboundId] = useState('trigger');
 
   // V2 edge routing condition and payloads
   const [edgeType, setEdgeType] = useState<ConnectionType>('rest');
@@ -64,14 +66,24 @@ export default function Sidebar() {
     if (selectedNode) {
       setNodeLabel(selectedNode.data.label || '');
       setNodeDesc(selectedNode.data.description || '');
-      setNodeHost(selectedNode.data.host || '');
-      setNodePort(selectedNode.data.port || '');
-      setNodeDbName(selectedNode.data.dbName || '');
       setNodeUrl(selectedNode.data.url || '');
       setNodeResponseTemplate(selectedNode.data.responseTemplate || '');
       setNodeJsonError(null);
+      
+      const nodeInboundPaths = edges.filter((e) => e.target === selectedNode.id && e.source !== selectedNode.id);
+      
+      const currentIsValid = selectedInboundId === 'trigger'
+        ? !!selectedNode.data.isTrigger
+        : nodeInboundPaths.some(e => e.id === selectedInboundId);
+      
+      if (!currentIsValid) {
+        const defaultInbound = selectedNode.data.isTrigger
+          ? 'trigger'
+          : (nodeInboundPaths[0]?.id || 'trigger');
+        setSelectedInboundId(defaultInbound);
+      }
     }
-  }, [selectedNode, selectedElement]);
+  }, [selectedNode, selectedElement, edges, selectedInboundId]);
 
   useEffect(() => {
     if (selectedEdge) {
@@ -162,17 +174,28 @@ export default function Sidebar() {
     { type: 'database', label: 'Database', icon: Database, color: 'text-blue-400 border-blue-500/20 bg-blue-950/10' },
     { type: 'kafka', label: 'Message Queue', icon: MessageSquare, color: 'text-purple-400 border-purple-500/20 bg-purple-950/10' },
     { type: 'api', label: 'External API', icon: Globe, color: 'text-amber-400 border-amber-500/20 bg-amber-950/10' },
+    { type: 'function', label: 'Function', icon: Code2, color: 'text-pink-400 border-pink-500/20 bg-pink-950/10' },
   ];
 
   // Retrieve active simulation payload if any selected element currently has one
   const activeSimulationPayload = selectedNode 
-    ? simulationActivePayloads[selectedNode.id] 
+    ? activeMessages.find((m) => m.locationId === selectedNode.id && m.locationType === 'node')?.payload
     : selectedEdge 
-      ? simulationActivePayloads[selectedEdge.id] 
+      ? activeMessages.find((m) => m.locationId === selectedEdge.id && m.locationType === 'edge')?.payload
       : null;
 
+  // Filter outgoing paths for selected node (excluding self-loops)
+  const outgoingPaths = selectedNode
+    ? edges.filter((e) => e.source === selectedNode.id && e.target !== selectedNode.id)
+    : [];
+
+  // Filter inbound paths for selected node (excluding self-loops)
+  const inboundPaths = selectedNode
+    ? edges.filter((e) => e.target === selectedNode.id && e.source !== selectedNode.id)
+    : [];
+
   return (
-    <aside className="w-80 border-l border-slate-800 bg-slate-900/90 text-slate-100 flex flex-col h-full select-none z-10">
+    <aside className="w-80 border-l border-slate-800 bg-slate-900/90 text-slate-100 flex flex-col h-full select-none z-10 font-sans">
       {/* Sidebar Header */}
       <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/40">
         <h2 className="text-sm font-bold text-slate-200 tracking-wider flex items-center gap-1.5 uppercase m-0">
@@ -232,9 +255,9 @@ export default function Sidebar() {
             )}
           </div>
 
-          {/* V2 Live Payload Reader during Simulation */}
+          {/* V3 Live Payload Reader during Simulation */}
           {mode === 'simulation' && activeSimulationPayload && (
-            <div className="space-y-2 p-3.5 rounded-xl bg-indigo-950/20 border border-indigo-500/30">
+            <div className="space-y-2 p-3.5 rounded-xl bg-indigo-950/20 border border-indigo-500/30 animate-pulse">
               <div className="flex justify-between items-center select-none">
                 <span className="text-[10px] text-indigo-300 font-bold uppercase tracking-wider flex items-center gap-1">
                   <Terminal size={12} />
@@ -284,110 +307,6 @@ export default function Sidebar() {
               </div>
 
               {/* Dynamic Type-specific fields */}
-              {selectedNode.data.type === 'microservice' && (
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
-                      Host IP
-                    </label>
-                    <input
-                      type="text"
-                      value={nodeHost}
-                      disabled={mode === 'simulation'}
-                      onChange={(e) => {
-                        setNodeHost(e.target.value);
-                        handleNodeUpdate('host', e.target.value);
-                      }}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 disabled:opacity-50"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
-                      Port
-                    </label>
-                    <input
-                      type="text"
-                      value={nodePort}
-                      disabled={mode === 'simulation'}
-                      onChange={(e) => {
-                        setNodePort(e.target.value);
-                        handleNodeUpdate('port', e.target.value);
-                      }}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 disabled:opacity-50"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {selectedNode.data.type === 'database' && (
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
-                      DB Name
-                    </label>
-                    <input
-                      type="text"
-                      value={nodeDbName}
-                      disabled={mode === 'simulation'}
-                      onChange={(e) => {
-                        setNodeDbName(e.target.value);
-                        handleNodeUpdate('dbName', e.target.value);
-                      }}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 disabled:opacity-50"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
-                      Port
-                    </label>
-                    <input
-                      type="text"
-                      value={nodePort}
-                      disabled={mode === 'simulation'}
-                      onChange={(e) => {
-                        setNodePort(e.target.value);
-                        handleNodeUpdate('port', e.target.value);
-                      }}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 disabled:opacity-50"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {selectedNode.data.type === 'kafka' && (
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
-                      Broker Host
-                    </label>
-                    <input
-                      type="text"
-                      value={nodeHost}
-                      disabled={mode === 'simulation'}
-                      onChange={(e) => {
-                        setNodeHost(e.target.value);
-                        handleNodeUpdate('host', e.target.value);
-                      }}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 disabled:opacity-50"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
-                      Broker Port
-                    </label>
-                    <input
-                      type="text"
-                      value={nodePort}
-                      disabled={mode === 'simulation'}
-                      onChange={(e) => {
-                        setNodePort(e.target.value);
-                        handleNodeUpdate('port', e.target.value);
-                      }}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 disabled:opacity-50"
-                    />
-                  </div>
-                </div>
-              )}
 
               {selectedNode.data.type === 'api' && (
                 <div className="space-y-1.5">
@@ -454,6 +373,80 @@ export default function Sidebar() {
                 )}
                 <span className="text-[9px] text-slate-500 block leading-normal">
                   If set, outgoing connection payloads will merge with or be overridden by this template.
+                </span>
+              </div>
+
+              {/* V3 Outbound Routing Table Section */}
+              <div className="space-y-3.5 pt-2.5 border-t border-slate-800/80">
+                <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
+                  Node Routing Table
+                </label>
+
+                {/* Inbound Selection */}
+                <div className="space-y-1">
+                  <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider block">
+                    Inbound Connection (Source)
+                  </span>
+                  <select
+                    value={selectedInboundId}
+                    disabled={mode === 'simulation'}
+                    onChange={(e) => setSelectedInboundId(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 disabled:opacity-50"
+                  >
+                    {selectedNode.data.isTrigger && (
+                      <option value="trigger">Initial Trigger</option>
+                    )}
+                    {inboundPaths.map((edge) => {
+                      const sourceNode = nodes.find((n) => n.id === edge.source);
+                      const sourceName = sourceNode ? sourceNode.data.label : 'Unknown';
+                      const protocol = edge.data?.connectionType?.toUpperCase() || 'REST';
+                      return (
+                        <option key={edge.id} value={edge.id}>
+                          {sourceName} ({protocol})
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+
+                {/* Outbound Paths Checklist */}
+                <div className="space-y-1">
+                  <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider block">
+                    Allowed Outbound Paths
+                  </span>
+                  {outgoingPaths.length > 0 ? (
+                    <div className="space-y-1.5 bg-slate-950 p-2.5 rounded-lg border border-slate-800 max-h-36 overflow-y-auto scrollbar-thin select-none">
+                      {outgoingPaths.map((edge) => {
+                        const target = nodes.find((n) => n.id === edge.target);
+                        const targetName = target ? target.data.label : 'Unknown Node';
+                        const protocol = edge.data?.connectionType?.toUpperCase() || 'REST';
+                        const isChecked = selectedNode.data.routingTable?.[selectedInboundId]?.[edge.id] !== false;
+
+                        return (
+                          <div key={edge.id} className="flex items-center justify-between text-xs text-slate-300 py-0.5">
+                            <span className="truncate max-w-[170px]" title={`➔ ${targetName} (${protocol})`}>
+                              ➔ {targetName} <span className="text-[9px] font-mono text-slate-500 font-bold">({protocol})</span>
+                            </span>
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              disabled={mode === 'simulation'}
+                              onChange={() => toggleRoute(selectedNode.id, selectedInboundId, edge.id, !isChecked)}
+                              className="h-4.5 w-4.5 rounded border-slate-800 text-indigo-600 bg-slate-950 focus:ring-indigo-500 cursor-pointer accent-indigo-500 disabled:opacity-50 transition-colors"
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-[10px] text-slate-500 italic m-0 bg-slate-950/40 p-2.5 border border-dashed border-slate-800/40 rounded-lg">
+                      No outgoing connections from this node.
+                    </p>
+                  )}
+                </div>
+
+                <span className="text-[9px] text-slate-500 block leading-normal">
+                  Opt-out routing: Uncheck paths to block message propagation for messages entering from the selected inbound connection.
                 </span>
               </div>
 

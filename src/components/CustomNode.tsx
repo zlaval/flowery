@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import { Handle, Position } from '@xyflow/react';
 import type { NodeProps } from '@xyflow/react';
-import { Server, Database, MessageSquare, Globe, Flame } from 'lucide-react';
+import { Server, Database, MessageSquare, Globe, Flame, Play, Code2 } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import type { NodeType, CustomNodeData } from '../store/useStore';
 
@@ -16,6 +16,14 @@ const typeConfigs: Record<
     typeName: string;
   }
 > = {
+  start: {
+    colorClass: 'text-indigo-400',
+    borderClass: 'border-indigo-500/30',
+    bgClass: 'bg-indigo-950/20',
+    glowClass: 'shadow-indigo-500/20 ring-indigo-500/40',
+    icon: Play,
+    typeName: 'Start Node',
+  },
   microservice: {
     colorClass: 'text-emerald-400',
     borderClass: 'border-emerald-500/30',
@@ -48,6 +56,14 @@ const typeConfigs: Record<
     icon: Globe,
     typeName: 'External API',
   },
+  function: {
+    colorClass: 'text-pink-400',
+    borderClass: 'border-pink-500/30',
+    bgClass: 'bg-pink-950/20',
+    glowClass: 'shadow-pink-500/20 ring-pink-500/40',
+    icon: Code2,
+    typeName: 'Function',
+  },
 };
 
 const CustomNode = ({ id, data, selected }: NodeProps<any>) => {
@@ -56,7 +72,9 @@ const CustomNode = ({ id, data, selected }: NodeProps<any>) => {
   const Icon = config.icon;
 
   // Retrieve active simulation payload if this node holds the message
-  const activePayload = useStore((state) => state.simulationActivePayloads[id]);
+  const activePayload = useStore((state) => 
+    state.activeMessages.find(m => m.locationId === id && m.locationType === 'node')?.payload
+  );
 
   return (
     <div
@@ -65,15 +83,17 @@ const CustomNode = ({ id, data, selected }: NodeProps<any>) => {
       } ${nodeData.hasMessage ? config.glowClass : ''}`}
     >
       {/* Handles */}
-      <Handle
-        type="target"
-        position={Position.Left}
-        id="input"
-        className="!h-3 !w-3 !bg-slate-700 hover:!bg-indigo-500"
-      />
+      {nodeData.type !== 'start' && (
+        <Handle
+          type="target"
+          position={Position.Left}
+          id="input"
+          className="!h-3 !w-3 !bg-slate-700 hover:!bg-indigo-500"
+        />
+      )}
       
       {/* Node Header */}
-      <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+      <div className="flex items-center justify-between pb-2">
         <div className="flex items-center gap-2">
           <div className={`rounded-lg p-1.5 ${config.bgClass} ${config.colorClass}`}>
             <Icon size={18} />
@@ -90,7 +110,7 @@ const CustomNode = ({ id, data, selected }: NodeProps<any>) => {
 
         {/* Trigger Point & Active Message Badges */}
         <div className="flex gap-1 items-center">
-          {nodeData.responseTemplate?.trim() && (
+          {nodeData.responseTemplate?.trim() && nodeData.type !== 'start' && (
             <span className="rounded px-1 py-0.5 text-[8px] font-mono font-bold bg-teal-950 text-teal-300 border border-teal-500/20" title="Mutates incoming payloads">
               TX
             </span>
@@ -111,42 +131,16 @@ const CustomNode = ({ id, data, selected }: NodeProps<any>) => {
       </div>
 
       {/* Node Details (depends on type) */}
-      <div className="mt-2.5 space-y-1 text-[11px] font-mono text-slate-400">
-        {nodeData.type === 'microservice' && (
-          <div className="flex justify-between">
-            <span>Host:</span>
-            <span className="text-slate-300 font-semibold">{nodeData.host || '127.0.0.1'}</span>
-          </div>
-        )}
-        {nodeData.type === 'database' && (
-          <>
-            <div className="flex justify-between">
-              <span>DB:</span>
-              <span className="text-slate-300 font-semibold">{nodeData.dbName || 'db'}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Port:</span>
-              <span className="text-slate-300 font-semibold">{nodeData.port || '5432'}</span>
-            </div>
-          </>
-        )}
-        {nodeData.type === 'kafka' && (
-          <div className="flex justify-between">
-            <span>Broker:</span>
-            <span className="text-slate-300 font-semibold truncate max-w-[110px]">
-              {nodeData.host || 'localhost'}
-            </span>
-          </div>
-        )}
-        {nodeData.type === 'api' && (
+      {nodeData.type === 'api' && (
+        <div className="mt-2.5 space-y-1 text-[11px] font-mono text-slate-400">
           <div className="flex flex-col gap-0.5">
             <span>Base URL:</span>
             <span className="text-slate-300 font-semibold truncate block" title={nodeData.url}>
               {nodeData.url || 'https://api.com'}
             </span>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Telemetry live snippet if node is holding message */}
       {nodeData.hasMessage && activePayload && (
