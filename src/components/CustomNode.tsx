@@ -74,6 +74,11 @@ const CustomNode = ({ id, data, selected }: NodeProps<any>) => {
   const startSimulation = useStore((state) => state.startSimulation);
   const setTriggerNode = useStore((state) => state.setTriggerNode);
 
+  // Check if Start node already has an outbound edge
+  const hasOutboundEdge = useStore((state) =>
+    nodeData.type === 'start' && state.edges.some((e) => e.source === id)
+  );
+
   const handleStartClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (mode === 'edit') {
@@ -90,13 +95,81 @@ const CustomNode = ({ id, data, selected }: NodeProps<any>) => {
       } ${nodeData.hasMessage ? config.glowClass : ''}`}
     >
       {/* Handles */}
-      {nodeData.type !== 'start' && (
+      {nodeData.type === 'start' ? (
         <Handle
-          type="target"
-          position={Position.Left}
-          id="input"
-          className="!h-3 !w-3 !bg-slate-700 hover:!bg-indigo-500"
+          type="source"
+          position={Position.Right}
+          id="output"
+          style={{ top: '50%' }}
+          isConnectable={!hasOutboundEdge}
+          className="!h-3 !w-3 !bg-orange-600 hover:!bg-orange-500 hover:scale-125 border border-slate-950 shadow rounded-full transition-all cursor-crosshair z-20"
         />
+      ) : (
+        <>
+          {/* Left Side (spaced) */}
+          <Handle
+            type="target"
+            position={Position.Left}
+            id="input"
+            style={{ top: '35%' }}
+            className="!h-3 !w-3 !bg-blue-500 hover:!bg-blue-400 hover:scale-125 border border-slate-950 shadow rounded-full transition-all cursor-crosshair z-20"
+          />
+          <Handle
+            type="source"
+            position={Position.Left}
+            id="output-left"
+            style={{ top: '65%' }}
+            className="!h-3 !w-3 !bg-orange-600 hover:!bg-orange-500 hover:scale-125 border border-slate-950 shadow rounded-full transition-all cursor-crosshair z-20"
+          />
+
+          {/* Right Side (spaced) */}
+          <Handle
+            type="target"
+            position={Position.Right}
+            id="input-right"
+            style={{ top: '35%' }}
+            className="!h-3 !w-3 !bg-blue-500 hover:!bg-blue-400 hover:scale-125 border border-slate-950 shadow rounded-full transition-all cursor-crosshair z-20"
+          />
+          <Handle
+            type="source"
+            position={Position.Right}
+            id="output"
+            style={{ top: '65%' }}
+            className="!h-3 !w-3 !bg-orange-600 hover:!bg-orange-500 hover:scale-125 border border-slate-950 shadow rounded-full transition-all cursor-crosshair z-20"
+          />
+
+          {/* Top Side (spaced) */}
+          <Handle
+            type="target"
+            position={Position.Top}
+            id="input-top"
+            style={{ left: '35%' }}
+            className="!h-3 !w-3 !bg-blue-500 hover:!bg-blue-400 hover:scale-125 border border-slate-950 shadow rounded-full transition-all cursor-crosshair z-20"
+          />
+          <Handle
+            type="source"
+            position={Position.Top}
+            id="output-top"
+            style={{ left: '65%' }}
+            className="!h-3 !w-3 !bg-orange-600 hover:!bg-orange-500 hover:scale-125 border border-slate-950 shadow rounded-full transition-all cursor-crosshair z-20"
+          />
+
+          {/* Bottom Side (spaced) */}
+          <Handle
+            type="target"
+            position={Position.Bottom}
+            id="input-bottom"
+            style={{ left: '35%' }}
+            className="!h-3 !w-3 !bg-blue-500 hover:!bg-blue-400 hover:scale-125 border border-slate-950 shadow rounded-full transition-all cursor-crosshair z-20"
+          />
+          <Handle
+            type="source"
+            position={Position.Bottom}
+            id="output-bottom"
+            style={{ left: '65%' }}
+            className="!h-3 !w-3 !bg-orange-600 hover:!bg-orange-500 hover:scale-125 border border-slate-950 shadow rounded-full transition-all cursor-crosshair z-20"
+          />
+        </>
       )}
       
       {/* Node Header */}
@@ -159,13 +232,7 @@ const CustomNode = ({ id, data, selected }: NodeProps<any>) => {
         </div>
       )}
 
-      {/* Handle */}
-      <Handle
-        type="source"
-        position={Position.Right}
-        id="output"
-        className="!h-3 !w-3 !bg-slate-700 hover:!bg-indigo-500"
-      />
+
     </div>
   );
 };

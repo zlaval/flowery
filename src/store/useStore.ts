@@ -483,6 +483,13 @@ export const useStore = create<AppState>((set, get) => {
       );
       if (duplicate) return;
 
+      // Prevent Start node from having more than one outbound edge
+      const srcNode = get().nodes.find((n) => n.id === connection.source);
+      if (srcNode?.data.type === 'start') {
+        const hasExistingOutbound = get().edges.some((edge) => edge.source === connection.source);
+        if (hasExistingOutbound) return;
+      }
+
       const edgeId = `edge-${Date.now()}`;
       const newEdge: AppEdge = {
         id: edgeId,
