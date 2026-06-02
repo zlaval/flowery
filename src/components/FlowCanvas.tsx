@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import {
   ReactFlow,
   MiniMap,
@@ -12,6 +12,7 @@ import '@xyflow/react/dist/style.css';
 import { useStore } from '../store/useStore';
 import CustomNode from './CustomNode';
 import CustomEdge from './CustomEdge';
+import { Server, Database, MessageSquare, Copy, Trash2, Flame } from 'lucide-react';
 
 // Register custom nodes and edges
 const nodeTypes = {
@@ -22,6 +23,13 @@ const edgeTypes = {
   customEdge: CustomEdge,
 };
 
+interface MenuState {
+  visible: boolean;
+  x: number;
+  y: number;
+  nodeId?: string;
+}
+
 export default function FlowCanvas() {
   const {
     nodes,
@@ -31,7 +39,13 @@ export default function FlowCanvas() {
     onConnect,
     selectElement,
     mode,
+    addNode,
+    duplicateNode,
+    deleteNode,
+    setTriggerNode,
   } = useStore();
+
+  const [menu, setMenu] = useState<MenuState>({ visible: false, x: 0, y: 0 });
 
   const handleNodeClick = useCallback<NodeMouseHandler>(
     (_, node) => {
@@ -51,6 +65,44 @@ export default function FlowCanvas() {
     selectElement(null);
   }, [selectElement]);
 
+  const onNodeContextMenu = useCallback(
+    (event: any, node: any) => {
+      event.preventDefault();
+      setMenu({
+        visible: true,
+        x: event.clientX,
+        y: event.clientY,
+        nodeId: node.id,
+      });
+    },
+    [setMenu]
+  );
+
+  const onPaneContextMenu = useCallback(
+    (event: any) => {
+      event.preventDefault();
+      setMenu({
+        visible: true,
+        x: event.clientX,
+        y: event.clientY,
+      });
+    },
+    [setMenu]
+  );
+
+  // Close context menu on any standard click outside
+  useEffect(() => {
+    const handleCloseMenu = () => {
+      if (menu.visible) {
+        setMenu({ visible: false, x: 0, y: 0 });
+      }
+    };
+    window.addEventListener('click', handleCloseMenu);
+    return () => {
+      window.removeEventListener('click', handleCloseMenu);
+    };
+  }, [menu.visible]);
+
   return (
     <div className="flex-1 h-full w-full relative">
       <ReactFlow
@@ -64,6 +116,8 @@ export default function FlowCanvas() {
         onNodeClick={handleNodeClick}
         onEdgeClick={handleEdgeClick}
         onPaneClick={handlePaneClick}
+        onNodeContextMenu={onNodeContextMenu}
+        onPaneContextMenu={onPaneContextMenu}
         // Restrict modifications during simulation mode
         nodesDraggable={mode === 'edit'}
         nodesConnectable={mode === 'edit'}
@@ -103,6 +157,78 @@ export default function FlowCanvas() {
           }}
         />
       </ReactFlow>
+
+      {/* Floating Custom Right-Click Context Menu */}
+      {menu.visible && (
+        <div
+          style={{ top: menu.y, left: menu.x }}
+          className="fixed z-50 min-w-[170px] bg-slate-900/95 border border-slate-800 rounded-xl shadow-2xl p-1.5 backdrop-blur-md select-none font-sans"
+        >
+          {menu.nodeId ? (
+            // Node Context Options
+            <div className="space-y-0.5">
+              <button
+                onClick={() => setTriggerNode(menu.nodeId!)}
+                className="w-full text-left px-3 py-2 text-xs font-semibold text-slate-300 hover:text-white hover:bg-indigo-600 rounded-lg flex items-center gap-2 cursor-pointer transition-colors"
+              >
+                <Flame size={13} className="text-indigo-400" />
+                Set as Trigger
+              </button>
+              {mode === 'edit' && (
+                <>
+                  <button
+                    onClick={() => duplicateNode(menu.nodeId!)}
+                    className="w-full text-left px-3 py-2 text-xs font-semibold text-slate-300 hover:text-white hover:bg-indigo-600 rounded-lg flex items-center gap-2 cursor-pointer transition-colors"
+                  >
+                    <Copy size={13} className="text-emerald-400" />
+                    Duplicate Node
+                  </button>
+                  <button
+                    onClick={() => deleteNode(menu.nodeId!)}
+                    className="w-full text-left px-3 py-2 text-xs font-semibold text-red-400 hover:text-white hover:bg-red-600 rounded-lg flex items-center gap-2 cursor-pointer transition-colors animate-pulse"
+                  >
+                    <Trash2 size={13} />
+                    Delete Node
+                  </button>
+                </>
+              )}
+            </div>
+          ) : (
+            // Pane Canvas Context Options
+            <div className="space-y-0.5">
+              {mode === 'edit' ? (
+                <>
+                  <button
+                    onClick={() => addNode('microservice')}
+                    className="w-full text-left px-3 py-2 text-xs font-semibold text-slate-300 hover:text-white hover:bg-indigo-600 rounded-lg flex items-center gap-2 cursor-pointer transition-colors"
+                  >
+                    <Server size={13} className="text-emerald-400" />
+                    Add Microservice
+                  </button>
+                  <button
+                    onClick={() => addNode('database')}
+                    className="w-full text-left px-3 py-2 text-xs font-semibold text-slate-300 hover:text-white hover:bg-indigo-600 rounded-lg flex items-center gap-2 cursor-pointer transition-colors"
+                  >
+                    <Database size={13} className="text-blue-400" />
+                    Add Database
+                  </button>
+                  <button
+                    onClick={() => addNode('kafka')}
+                    className="w-full text-left px-3 py-2 text-xs font-semibold text-slate-300 hover:text-white hover:bg-indigo-600 rounded-lg flex items-center gap-2 cursor-pointer transition-colors"
+                  >
+                    <MessageSquare size={13} className="text-purple-400" />
+                    Add Queue
+                  </button>
+                </>
+              ) : (
+                <div className="px-3 py-1.5 text-slate-500 text-[10px] font-mono">
+                  Simulation Active (Locked)
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

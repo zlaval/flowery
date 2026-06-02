@@ -9,6 +9,7 @@
   /* Custom Animations */
   --animate-flow-dash: flow-dash 1.5s linear infinite;
   --animate-pulse-glow: pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  --animate-flash-red: flash-red 1.5s ease-in-out infinite;
 
   @keyframes flow-dash {
     from {
@@ -26,6 +27,16 @@
     50% {
       opacity: 1;
       filter: drop-shadow(0 0 8px rgba(99, 102, 241, 0.8));
+    }
+  }
+  @keyframes flash-red {
+    0%, 100% {
+      stroke: #ef4444;
+      filter: drop-shadow(0 0 2px rgba(239, 68, 68, 0.4));
+    }
+    50% {
+      stroke: #f87171;
+      filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.8));
     }
   }
 }
@@ -89,6 +100,11 @@ html, body, #root {
 .flow-edge-animated {
   stroke-dasharray: 6 6;
   animation: flow-dash var(--animation-duration, 1.5s) linear infinite;
+}
+
+.flow-edge-failed {
+  stroke-dasharray: 4 4;
+  animation: flow-dash 1s linear infinite, flash-red 1.5s ease-in-out infinite;
 }
 
 .flow-edge-pulse {

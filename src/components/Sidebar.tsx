@@ -11,6 +11,8 @@ import {
   Check,
   Sparkles,
   Flame,
+  Route,
+  Terminal,
 } from 'lucide-react';
 
 export default function Sidebar() {
@@ -26,6 +28,7 @@ export default function Sidebar() {
     triggerNodeId,
     setTriggerNode,
     mode,
+    simulationActivePayloads,
   } = useStore();
 
   const [nodeLabel, setNodeLabel] = useState('');
@@ -34,10 +37,16 @@ export default function Sidebar() {
   const [nodePort, setNodePort] = useState('');
   const [nodeDbName, setNodeDbName] = useState('');
   const [nodeUrl, setNodeUrl] = useState('');
+  
+  // V2 node response template states
+  const [nodeResponseTemplate, setNodeResponseTemplate] = useState('');
+  const [nodeJsonError, setNodeJsonError] = useState<string | null>(null);
 
+  // V2 edge routing condition and payloads
   const [edgeType, setEdgeType] = useState<ConnectionType>('rest');
   const [edgeDesc, setEdgeDesc] = useState('');
   const [edgePayload, setEdgePayload] = useState('');
+  const [edgeCondition, setEdgeCondition] = useState('');
   const [jsonError, setJsonError] = useState<string | null>(null);
 
   // Sync selected element details with local state
@@ -59,6 +68,8 @@ export default function Sidebar() {
       setNodePort(selectedNode.data.port || '');
       setNodeDbName(selectedNode.data.dbName || '');
       setNodeUrl(selectedNode.data.url || '');
+      setNodeResponseTemplate(selectedNode.data.responseTemplate || '');
+      setNodeJsonError(null);
     }
   }, [selectedNode, selectedElement]);
 
@@ -67,14 +78,45 @@ export default function Sidebar() {
       setEdgeType(selectedEdge.data?.connectionType || 'rest');
       setEdgeDesc(selectedEdge.data?.description || '');
       setEdgePayload(selectedEdge.data?.payload || '');
+      setEdgeCondition(selectedEdge.data?.routingCondition || '');
       setJsonError(null);
     }
   }, [selectedEdge, selectedElement]);
 
   const handleNodeUpdate = (field: string, val: string) => {
     if (!selectedNode) return;
-    const updateData: Record<string, string> = { [field]: val };
-    updateNodeData(selectedNode.id, updateData);
+    updateNodeData(selectedNode.id, { [field]: val });
+  };
+
+  const handleNodeResponseTemplateChange = (val: string) => {
+    if (!selectedNode) return;
+    setNodeResponseTemplate(val);
+    if (!val.trim()) {
+      setNodeJsonError(null);
+      updateNodeData(selectedNode.id, { responseTemplate: '' });
+      return;
+    }
+    try {
+      JSON.parse(val);
+      setNodeJsonError(null);
+      updateNodeData(selectedNode.id, { responseTemplate: val });
+    } catch (err: any) {
+      setNodeJsonError(err.message);
+    }
+  };
+
+  const formatNodeJson = () => {
+    try {
+      const parsed = JSON.parse(nodeResponseTemplate);
+      const formatted = JSON.stringify(parsed, null, 2);
+      setNodeResponseTemplate(formatted);
+      setNodeJsonError(null);
+      if (selectedNode) {
+        updateNodeData(selectedNode.id, { responseTemplate: formatted });
+      }
+    } catch (err: any) {
+      setNodeJsonError(err.message);
+    }
   };
 
   const handleEdgeUpdate = (field: string, val: string) => {
@@ -91,6 +133,13 @@ export default function Sidebar() {
       }
     } else {
       updateEdgeData(selectedEdge.id, { [field]: val });
+    }
+  };
+
+  const handleConditionChange = (val: string) => {
+    setEdgeCondition(val);
+    if (selectedEdge) {
+      updateEdgeData(selectedEdge.id, { routingCondition: val });
     }
   };
 
@@ -115,6 +164,13 @@ export default function Sidebar() {
     { type: 'api', label: 'External API', icon: Globe, color: 'text-amber-400 border-amber-500/20 bg-amber-950/10' },
   ];
 
+  // Retrieve active simulation payload if any selected element currently has one
+  const activeSimulationPayload = selectedNode 
+    ? simulationActivePayloads[selectedNode.id] 
+    : selectedEdge 
+      ? simulationActivePayloads[selectedEdge.id] 
+      : null;
+
   return (
     <aside className="w-80 border-l border-slate-800 bg-slate-900/90 text-slate-100 flex flex-col h-full select-none z-10">
       {/* Sidebar Header */}
@@ -124,9 +180,9 @@ export default function Sidebar() {
           Dashboard
         </h2>
         {mode === 'simulation' && (
-          <span className="flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-bold bg-indigo-950 text-indigo-400 border border-indigo-900">
-            <span className="h-1.5 w-1.5 rounded-full bg-indigo-500 animate-ping"></span>
-            Simulation Active
+          <span className="flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-bold bg-indigo-950 text-indigo-400 border border-indigo-900 animate-pulse">
+            <span className="h-1.5 w-1.5 rounded-full bg-indigo-500"></span>
+            Sim Active
           </span>
         )}
       </div>
@@ -175,6 +231,22 @@ export default function Sidebar() {
               </button>
             )}
           </div>
+
+          {/* V2 Live Payload Reader during Simulation */}
+          {mode === 'simulation' && activeSimulationPayload && (
+            <div className="space-y-2 p-3.5 rounded-xl bg-indigo-950/20 border border-indigo-500/30">
+              <div className="flex justify-between items-center select-none">
+                <span className="text-[10px] text-indigo-300 font-bold uppercase tracking-wider flex items-center gap-1">
+                  <Terminal size={12} />
+                  Active Telemetry
+                </span>
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+              </div>
+              <pre className="p-3 bg-slate-950 border border-slate-800 rounded-lg text-[10px] font-mono text-emerald-400 leading-relaxed overflow-x-auto whitespace-pre-wrap max-h-48 scrollbar-thin">
+                {activeSimulationPayload}
+              </pre>
+            </div>
+          )}
 
           {/* Node Selected Inspector */}
           {selectedNode && (
@@ -335,6 +407,56 @@ export default function Sidebar() {
                 </div>
               )}
 
+              {/* V2 Node Response Template Editor */}
+              <div className="space-y-1.5 pt-2 border-t border-slate-800/80">
+                <div className="flex justify-between items-center">
+                  <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
+                    Response Template (JSON)
+                  </label>
+                  <button
+                    onClick={formatNodeJson}
+                    className="text-[9px] font-bold text-indigo-400 hover:text-indigo-300 transition-colors bg-indigo-950/30 px-1.5 py-0.5 rounded cursor-pointer"
+                  >
+                    Format
+                  </button>
+                </div>
+                <div className="relative font-mono">
+                  <textarea
+                    value={nodeResponseTemplate}
+                    disabled={mode === 'simulation'}
+                    onChange={(e) => handleNodeResponseTemplateChange(e.target.value)}
+                    placeholder='{"status": "SUCCESS"}'
+                    rows={6}
+                    className={`w-full bg-slate-950 border rounded-lg p-3 text-[11px] leading-relaxed text-slate-300 focus:outline-none disabled:opacity-75 ${
+                      nodeJsonError ? 'border-red-500/50 focus:border-red-500' : 'border-slate-800 focus:border-indigo-500'
+                    }`}
+                  />
+                  {nodeResponseTemplate.trim() && (
+                    <div className="absolute right-2.5 bottom-2.5 flex items-center gap-1.5">
+                      {nodeJsonError ? (
+                        <span className="flex items-center gap-1 text-[9px] font-bold bg-red-950/50 text-red-400 border border-red-500/20 px-1.5 py-0.5 rounded">
+                          <AlertCircle size={10} />
+                          Invalid JSON
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1 text-[9px] font-bold bg-emerald-950/50 text-emerald-400 border border-emerald-500/20 px-1.5 py-0.5 rounded">
+                          <Check size={10} />
+                          Valid
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+                {nodeJsonError && (
+                  <p className="text-[10px] text-red-400 mt-1 font-mono leading-normal bg-red-950/10 p-2 rounded border border-red-500/10">
+                    {nodeJsonError}
+                  </p>
+                )}
+                <span className="text-[9px] text-slate-500 block leading-normal">
+                  If set, outgoing connection payloads will merge with or be overridden by this template.
+                </span>
+              </div>
+
               {/* Set Trigger Point Trigger button */}
               <div className="pt-2 border-t border-slate-800">
                 <button
@@ -350,48 +472,104 @@ export default function Sidebar() {
                   {selectedNode.id === triggerNodeId ? 'Designated Trigger Point' : 'Set as Trigger Point'}
                 </button>
               </div>
-
-              {/* Highlight if node holds message */}
-              {selectedNode.data.hasMessage && (
-                <div className="flex items-center gap-2 p-2.5 rounded-lg bg-indigo-950/20 border border-indigo-500/30 text-[11px] text-indigo-300">
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
-                  </span>
-                  <span>Currently holding the message payload.</span>
-                </div>
-              )}
             </div>
           )}
 
           {/* Edge Selected Inspector */}
           {selectedEdge && (
             <div className="space-y-4">
-              <div className="space-y-1.5">
+              {/* V2 Protocol Selection Layer Sections */}
+              <div className="space-y-2">
                 <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
                   Connection Protocol
                 </label>
-                <div className="grid grid-cols-3 gap-1">
-                  {(['rest', 'grpc', 'queue'] as ConnectionType[]).map((t) => (
-                    <button
-                      key={t}
-                      disabled={mode === 'simulation'}
-                      onClick={() => {
-                        setEdgeType(t);
-                        handleEdgeUpdate('connectionType', t);
-                      }}
-                      className={`py-1 rounded-md text-[10px] font-bold uppercase border transition-all duration-200 cursor-pointer ${
-                        edgeType === t
-                          ? 'bg-indigo-600 text-white border-indigo-500'
-                          : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
-                      }`}
-                    >
-                      {t === 'queue' ? 'Queue' : t === 'grpc' ? 'gRPC' : 'REST'}
-                    </button>
-                  ))}
+                
+                {/* Application Layer protocols */}
+                <div className="space-y-1">
+                  <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider block">Application Layer</span>
+                  <div className="grid grid-cols-3 gap-1">
+                    {[
+                      ['rest', 'REST'],
+                      ['grpc', 'gRPC'],
+                      ['graphql', 'GraphQL'],
+                      ['soap', 'SOAP'],
+                      ['websocket', 'WS'],
+                    ].map(([t, label]) => (
+                      <button
+                        key={t}
+                        disabled={mode === 'simulation'}
+                        onClick={() => {
+                          setEdgeType(t as ConnectionType);
+                          handleEdgeUpdate('connectionType', t);
+                        }}
+                        className={`py-1 rounded-md text-[9px] font-bold border transition-all duration-200 cursor-pointer ${
+                          edgeType === t
+                            ? 'bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-600/10'
+                            : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Transport Layer protocols */}
+                <div className="space-y-1 pt-1.5">
+                  <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider block">Transport Layer</span>
+                  <div className="grid grid-cols-2 gap-1">
+                    {[
+                      ['tcp', 'TCP'],
+                      ['udp', 'UDP'],
+                    ].map(([t, label]) => (
+                      <button
+                        key={t}
+                        disabled={mode === 'simulation'}
+                        onClick={() => {
+                          setEdgeType(t as ConnectionType);
+                          handleEdgeUpdate('connectionType', t);
+                        }}
+                        className={`py-1 rounded-md text-[9px] font-bold border transition-all duration-200 cursor-pointer ${
+                          edgeType === t
+                            ? 'bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-600/10'
+                            : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Queues / Messaging Layer protocols */}
+                <div className="space-y-1 pt-1.5">
+                  <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider block">Message Brokers</span>
+                  <div className="grid grid-cols-2 gap-1">
+                    {[
+                      ['kafka', 'Kafka'],
+                      ['rabbitmq', 'RabbitMQ'],
+                    ].map(([t, label]) => (
+                      <button
+                        key={t}
+                        disabled={mode === 'simulation'}
+                        onClick={() => {
+                          setEdgeType(t as ConnectionType);
+                          handleEdgeUpdate('connectionType', t);
+                        }}
+                        className={`py-1 rounded-md text-[9px] font-bold border transition-all duration-200 cursor-pointer ${
+                          edgeType === t
+                            ? 'bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-600/10'
+                            : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
 
+              {/* Description */}
               <div className="space-y-1.5">
                 <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
                   Description
@@ -408,11 +586,36 @@ export default function Sidebar() {
                 />
               </div>
 
+              {/* V2 Routing Condition IF logic */}
+              <div className="space-y-1.5 pt-2.5 border-t border-slate-800/80">
+                <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1.5 block">
+                  <Route size={12} className="text-indigo-400" />
+                  Routing Condition (IF Expression)
+                </label>
+                <input
+                  type="text"
+                  value={edgeCondition}
+                  disabled={mode === 'simulation'}
+                  placeholder="e.g. payload.amount > 100"
+                  onChange={(e) => handleConditionChange(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-100 font-mono focus:outline-none focus:border-indigo-500 disabled:opacity-50"
+                />
+                
+                {/* Condition Tip Box */}
+                <div className="bg-slate-950/80 p-2.5 border border-slate-800 rounded-lg text-[9px] text-slate-400 font-mono leading-normal space-y-1">
+                  <span className="text-slate-500 uppercase font-bold text-[8px] block">Formatting Examples:</span>
+                  <p className="m-0 text-slate-300">`price &gt; 100`</p>
+                  <p className="m-0 text-slate-300">`status === "ACTIVE"`</p>
+                  <p className="m-0 text-slate-300">`payload.requires_shipping === true`</p>
+                  <p className="m-0 text-slate-500">If evaluation is false, this connection path is blocked and flashes red.</p>
+                </div>
+              </div>
+
               {/* Message Payload Editor */}
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 pt-2.5 border-t border-slate-800/80">
                 <div className="flex justify-between items-center">
                   <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
-                    Message Payload (JSON)
+                    Default Message Payload (JSON)
                   </label>
                   <button
                     onClick={formatJson}
@@ -427,7 +630,7 @@ export default function Sidebar() {
                     value={edgePayload}
                     disabled={mode === 'simulation'}
                     onChange={(e) => handleEdgeUpdate('payload', e.target.value)}
-                    rows={8}
+                    rows={6}
                     className={`w-full bg-slate-950 border rounded-lg p-3 text-[11px] leading-relaxed text-slate-300 focus:outline-none disabled:opacity-75 ${
                       jsonError ? 'border-red-500/50 focus:border-red-500' : 'border-slate-800 focus:border-indigo-500'
                     }`}
@@ -455,17 +658,6 @@ export default function Sidebar() {
                   </p>
                 )}
               </div>
-
-              {/* Highlight if edge is simulating message */}
-              {selectedEdge.data?.hasMessage && (
-                <div className="flex items-center gap-2 p-2.5 rounded-lg bg-indigo-950/20 border border-indigo-500/30 text-[11px] text-indigo-300">
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
-                  </span>
-                  <span>Message packet currently transmitting.</span>
-                </div>
-              )}
             </div>
           )}
 
@@ -477,7 +669,7 @@ export default function Sidebar() {
               </p>
               {mode === 'edit' && (
                 <p className="text-[10px] text-slate-500 mt-2 m-0">
-                  Tip: Create connections by dragging between node handles.
+                  Tip: Create connections by dragging between node handles. Right-click anywhere for context tools.
                 </p>
               )}
             </div>

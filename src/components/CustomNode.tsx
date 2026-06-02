@@ -2,6 +2,7 @@ import { memo } from 'react';
 import { Handle, Position } from '@xyflow/react';
 import type { NodeProps } from '@xyflow/react';
 import { Server, Database, MessageSquare, Globe, Flame } from 'lucide-react';
+import { useStore } from '../store/useStore';
 import type { NodeType, CustomNodeData } from '../store/useStore';
 
 const typeConfigs: Record<
@@ -49,10 +50,13 @@ const typeConfigs: Record<
   },
 };
 
-const CustomNode = ({ data, selected }: NodeProps<any>) => {
+const CustomNode = ({ id, data, selected }: NodeProps<any>) => {
   const nodeData = data as CustomNodeData;
   const config = typeConfigs[nodeData.type] || typeConfigs.microservice;
   const Icon = config.icon;
+
+  // Retrieve active simulation payload if this node holds the message
+  const activePayload = useStore((state) => state.simulationActivePayloads[id]);
 
   return (
     <div
@@ -75,7 +79,7 @@ const CustomNode = ({ data, selected }: NodeProps<any>) => {
             <Icon size={18} />
           </div>
           <div>
-            <h4 className="font-semibold text-sm text-slate-200 tracking-wide truncate max-w-[120px]">
+            <h4 className="font-semibold text-sm text-slate-200 tracking-wide truncate max-w-[110px]">
               {nodeData.label}
             </h4>
             <span className="text-[10px] text-slate-400 uppercase font-mono">
@@ -85,7 +89,12 @@ const CustomNode = ({ data, selected }: NodeProps<any>) => {
         </div>
 
         {/* Trigger Point & Active Message Badges */}
-        <div className="flex gap-1.5 items-center">
+        <div className="flex gap-1 items-center">
+          {nodeData.responseTemplate?.trim() && (
+            <span className="rounded px-1 py-0.5 text-[8px] font-mono font-bold bg-teal-950 text-teal-300 border border-teal-500/20" title="Mutates incoming payloads">
+              TX
+            </span>
+          )}
           {nodeData.isTrigger && (
             <span className="flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[9px] font-semibold bg-indigo-950 text-indigo-300 border border-indigo-500/30 animate-pulse">
               <Flame size={10} className="fill-indigo-400" />
@@ -138,6 +147,16 @@ const CustomNode = ({ data, selected }: NodeProps<any>) => {
           </div>
         )}
       </div>
+
+      {/* Telemetry live snippet if node is holding message */}
+      {nodeData.hasMessage && activePayload && (
+        <div className="mt-2.5 pt-2 border-t border-slate-800/60 flex flex-col gap-1 text-[9px] font-mono text-slate-400">
+          <span className="text-slate-500 uppercase tracking-wider text-[8px] font-bold">Live Payload Snippet</span>
+          <div className="bg-slate-950 p-1.5 rounded border border-slate-800 text-indigo-300 truncate max-w-full">
+            {activePayload.replace(/\s+/g, ' ')}
+          </div>
+        </div>
+      )}
 
       {/* Handle */}
       <Handle

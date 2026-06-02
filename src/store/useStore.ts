@@ -12,7 +12,16 @@ import type {
 } from '@xyflow/react';
 
 export type NodeType = 'microservice' | 'database' | 'kafka' | 'api';
-export type ConnectionType = 'rest' | 'queue' | 'grpc';
+export type ConnectionType =
+  | 'rest'
+  | 'grpc'
+  | 'graphql'
+  | 'soap'
+  | 'websocket'
+  | 'tcp'
+  | 'udp'
+  | 'kafka'
+  | 'rabbitmq';
 
 export interface CustomNodeData extends Record<string, unknown> {
   label: string;
@@ -24,6 +33,7 @@ export interface CustomNodeData extends Record<string, unknown> {
   port?: string;
   dbName?: string;
   url?: string;
+  responseTemplate?: string; // Optional response template JSON string
 }
 
 export interface CustomEdgeData extends Record<string, unknown> {
@@ -31,6 +41,7 @@ export interface CustomEdgeData extends Record<string, unknown> {
   payload: string; // JSON string
   hasMessage: boolean;
   description?: string;
+  routingCondition?: string; // Optional IF condition on edge
 }
 
 export type AppNode = Node<CustomNodeData>;
@@ -61,8 +72,13 @@ interface AppState {
   simulationSpeed: number; // multiplier (e.g. 1, 1.5, 2, 0.5)
   currentStep: number;
   
+  // V2 Simulation States
+  simulationActivePayloads: Record<string, string>; // mapping from Node/Edge ID to current active JSON payload
+  simulationFailedEdges: string[]; // List of edge IDs that failed condition evaluation
+
   // Graph manipulation actions
   addNode: (type: NodeType) => void;
+  duplicateNode: (id: string) => void;
   updateNodeData: (id: string, data: Partial<CustomNodeData>) => void;
   updateEdgeData: (id: string, data: Partial<CustomEdgeData>) => void;
   deleteNode: (id: string) => void;
@@ -99,6 +115,17 @@ const initialNodes: AppNode[] = [
       description: 'Main entry point for customer orders. Validates requests and orchestrates checkout.',
       host: '10.0.1.5',
       port: '8080',
+      responseTemplate: JSON.stringify(
+        {
+          order_id: "ord_2026_x89",
+          customer_id: "cust_9901",
+          amount: 249.99,
+          status: "ACTIVE",
+          requires_shipping: true
+        },
+        null,
+        2
+      ),
     },
   },
   {
@@ -127,6 +154,15 @@ const initialNodes: AppNode[] = [
       description: 'Processes credit cards, handles refunds, and coordinates with external gateways.',
       host: '10.0.1.12',
       port: '8082',
+      responseTemplate: JSON.stringify(
+        {
+          transaction_id: "tx_880192a",
+          status: "SUCCESS",
+          gateway: "stripe"
+        },
+        null,
+        2
+      ),
     },
   },
   {
@@ -218,28 +254,29 @@ const initialEdges: AppEdge[] = [
       ),
       hasMessage: false,
       description: 'gRPC call to trigger payment processing.',
+      routingCondition: 'payload.status === "ACTIVE"', // Evaluates to TRUE
     },
   },
   {
     id: 'edge-order-inventory',
     source: 'node-order-service',
     target: 'node-inventory-service',
-    type: 'grpc',
+    type: 'customEdge',
     data: {
       connectionType: 'grpc',
       payload: JSON.stringify(
         {
           method: "ReserveStockRequest",
           items: [
-            { sku: "sku-dev-board", qty: 1 },
-            { sku: "sku-cable-usb", qty: 2 }
+            { sku: "sku-dev-board", qty: 1 }
           ]
         },
         null,
         2
       ),
       hasMessage: false,
-      description: 'Reserve inventory items before confirming checkout.',
+      description: 'Reserve inventory items if shipping is required.',
+      routingCondition: 'payload.requires_shipping === false', // Evaluates to FALSE (will block and flash red!)
     },
   },
   {
@@ -248,7 +285,7 @@ const initialEdges: AppEdge[] = [
     target: 'node-kafka-queue',
     type: 'customEdge',
     data: {
-      connectionType: 'queue',
+      connectionType: 'kafka',
       payload: JSON.stringify(
         {
           topic: "payment-completed-events",
@@ -330,6 +367,8 @@ export const useStore = create<AppState>((set, get) => {
     simulationPhase: 'node',
     simulationSpeed: 1,
     currentStep: 0,
+    simulationActivePayloads: {},
+    simulationFailedEdges: [],
 
     // Flow handlers
     onNodesChange: (changes) => {
@@ -358,6 +397,7 @@ export const useStore = create<AppState>((set, get) => {
           payload: JSON.stringify({ message: "New Message Payload" }, null, 2),
           hasMessage: false,
           description: `Connects ${connection.source} to ${connection.target}`,
+          routingCondition: '',
         },
       };
 
@@ -379,10 +419,10 @@ export const useStore = create<AppState>((set, get) => {
       };
 
       const defaultData: Record<NodeType, Partial<CustomNodeData>> = {
-        microservice: { host: '127.0.0.1', port: '8080', description: 'Custom Microservice API endpoint.' },
-        database: { dbName: 'postgres', port: '5432', description: 'Relational Database Instance.' },
-        kafka: { host: 'localhost', port: '9092', description: 'Kafka Stream / Topic.' },
-        api: { url: 'https://api.example.com/v1', description: 'External third-party API provider.' },
+        microservice: { host: '127.0.0.1', port: '8080', description: 'Custom Microservice API endpoint.', responseTemplate: '' },
+        database: { dbName: 'postgres', port: '5432', description: 'Relational Database Instance.', responseTemplate: '' },
+        kafka: { host: 'localhost', port: '9092', description: 'Kafka Stream / Topic.', responseTemplate: '' },
+        api: { url: 'https://api.example.com/v1', description: 'External third-party API provider.', responseTemplate: '' },
       };
 
       const isFirstNode = get().nodes.length === 0;
@@ -403,6 +443,29 @@ export const useStore = create<AppState>((set, get) => {
       set({
         nodes: [...get().nodes, newNode],
         ...(isFirstNode ? { triggerNodeId: id } : {}),
+      });
+    },
+
+    duplicateNode: (id) => {
+      const node = get().nodes.find((n) => n.id === id);
+      if (!node) return;
+
+      const newId = `node-${node.data.type}-${Date.now()}`;
+      const offset = 40;
+      const newNode: AppNode = {
+        ...node,
+        id: newId,
+        position: { x: node.position.x + offset, y: node.position.y + offset },
+        selected: false,
+        data: {
+          ...node.data,
+          isTrigger: false,
+          hasMessage: false,
+        },
+      };
+
+      set({
+        nodes: [...get().nodes, newNode],
       });
     },
 
@@ -481,6 +544,8 @@ export const useStore = create<AppState>((set, get) => {
         simulationActiveEdges: [],
         simulationPhase: 'node',
         currentStep: 0,
+        simulationActivePayloads: {},
+        simulationFailedEdges: [],
       });
     },
 
@@ -512,10 +577,18 @@ export const useStore = create<AppState>((set, get) => {
           currentStep: 0,
           nodes: resetNodes,
           edges: resetEdges,
+          simulationActivePayloads: {},
+          simulationFailedEdges: [],
         });
       } else {
         // Set up initial state for simulation
         const triggerId = get().triggerNodeId;
+        const triggerNode = get().nodes.find(n => n.id === triggerId);
+        
+        const initialPayload = triggerNode?.data.responseTemplate?.trim()
+          ? triggerNode.data.responseTemplate
+          : JSON.stringify({ message: "Simulation started" }, null, 2);
+
         const resetNodes = get().nodes.map((node) => ({
           ...node,
           data: { 
@@ -523,10 +596,16 @@ export const useStore = create<AppState>((set, get) => {
             hasMessage: node.id === triggerId 
           },
         })) as AppNode[];
+        
         const resetEdges = get().edges.map((edge) => ({
           ...edge,
           data: { ...edge.data, hasMessage: false },
         })) as AppEdge[];
+
+        const activePayloads: Record<string, string> = {};
+        if (triggerId) {
+          activePayloads[triggerId] = initialPayload;
+        }
 
         set({
           mode,
@@ -537,6 +616,8 @@ export const useStore = create<AppState>((set, get) => {
           currentStep: 0,
           nodes: resetNodes,
           edges: resetEdges,
+          simulationActivePayloads: activePayloads,
+          simulationFailedEdges: [],
         });
       }
     },
@@ -560,11 +641,21 @@ export const useStore = create<AppState>((set, get) => {
       // If we are starting from scratch and have no active nodes/edges, reset to trigger point
       if (get().simulationActiveNodes.length === 0 && get().simulationActiveEdges.length === 0) {
         if (!triggerNodeId) return;
+        const triggerNode = nodes.find(n => n.id === triggerNodeId);
+        const initialPayload = triggerNode?.data.responseTemplate?.trim()
+          ? triggerNode.data.responseTemplate
+          : JSON.stringify({ message: "Simulation started" }, null, 2);
+
+        const activePayloads: Record<string, string> = {};
+        activePayloads[triggerNodeId] = initialPayload;
+
         set({
           simulationActiveNodes: [triggerNodeId],
           simulationActiveEdges: [],
           simulationPhase: 'node',
           currentStep: 0,
+          simulationActivePayloads: activePayloads,
+          simulationFailedEdges: [],
           nodes: nodes.map((node) => ({
             ...node,
             data: { ...node.data, hasMessage: node.id === triggerNodeId },
@@ -594,6 +685,8 @@ export const useStore = create<AppState>((set, get) => {
         simulationActiveEdges: [],
         simulationPhase: 'node',
         currentStep: 0,
+        simulationActivePayloads: {},
+        simulationFailedEdges: [],
         nodes: get().nodes.map((node) => ({
           ...node,
           data: { ...node.data, hasMessage: false },
@@ -613,6 +706,7 @@ export const useStore = create<AppState>((set, get) => {
         simulationPhase,
         edges,
         nodes,
+        simulationActivePayloads,
       } = get();
 
       // Can step in paused or running status, but not when stopped
@@ -621,13 +715,19 @@ export const useStore = create<AppState>((set, get) => {
       let nextActiveNodes: string[] = [];
       let nextActiveEdges: string[] = [];
       let nextPhase: 'node' | 'edge' = simulationPhase;
+      const nextActivePayloads: Record<string, string> = { ...simulationActivePayloads };
+      const newFailedEdges: string[] = [];
 
       if (simulationPhase === 'node') {
         if (simulationActiveNodes.length === 0) {
           // Reset to trigger point if everything goes dead
           const trigger = get().triggerNodeId;
           if (trigger) {
+            const triggerNode = nodes.find(n => n.id === trigger);
             nextActiveNodes = [trigger];
+            nextActivePayloads[trigger] = triggerNode?.data.responseTemplate?.trim()
+              ? triggerNode.data.responseTemplate
+              : JSON.stringify({ message: "Simulation started" }, null, 2);
             nextPhase = 'node';
           } else {
             stopInterval();
@@ -641,19 +741,112 @@ export const useStore = create<AppState>((set, get) => {
           );
 
           if (outgoingEdges.length > 0) {
-            nextActiveEdges = outgoingEdges.map((e) => e.id);
-            nextActiveNodes = [];
-            nextPhase = 'edge';
+            // Process payloads and conditions for each outgoing edge
+            outgoingEdges.forEach((edge) => {
+              const sourceNode = nodes.find(n => n.id === edge.source);
+              let activePayload = simulationActivePayloads[edge.source] || edge.data?.payload || '{}';
+
+              // If node has response template, mutate or override payload
+              if (sourceNode?.data.responseTemplate?.trim()) {
+                const template = sourceNode.data.responseTemplate.trim();
+                try {
+                  // Merge if both are JSON objects, else override
+                  const incomingObj = JSON.parse(activePayload);
+                  const templateObj = JSON.parse(template);
+                  if (
+                    typeof incomingObj === 'object' && incomingObj !== null &&
+                    typeof templateObj === 'object' && templateObj !== null
+                  ) {
+                    activePayload = JSON.stringify({ ...incomingObj, ...templateObj }, null, 2);
+                  } else {
+                    activePayload = template;
+                  }
+                } catch {
+                  activePayload = template;
+                }
+              }
+
+              // Evaluate edge routing condition (if exists)
+              const condition = edge.data?.routingCondition;
+              let conditionPassed = true;
+
+              if (condition && condition.trim()) {
+                try {
+                  let parsedPayload = {};
+                  try {
+                    parsedPayload = JSON.parse(activePayload);
+                  } catch {}
+
+                  // Safe execution context wrapper
+                  const evalFn = new Function('payload', `
+                    try {
+                      with (payload || {}) {
+                        return (${condition});
+                      }
+                    } catch (e) {
+                      return false;
+                    }
+                  `);
+                  conditionPassed = !!evalFn(parsedPayload);
+                } catch (err) {
+                  console.error(`Condition syntax error on edge ${edge.id}:`, err);
+                  conditionPassed = false;
+                }
+              }
+
+              if (conditionPassed) {
+                nextActiveEdges.push(edge.id);
+                nextActivePayloads[edge.id] = activePayload;
+              } else {
+                newFailedEdges.push(edge.id);
+              }
+            });
+
+            // If there are valid paths, transition to edge phase. Otherwise, pause flow.
+            if (nextActiveEdges.length > 0) {
+              nextActiveNodes = [];
+              nextPhase = 'edge';
+            } else {
+              // All paths are blocked
+              stopInterval();
+              
+              const updatedNodes = nodes.map((node) => ({
+                ...node,
+                data: {
+                  ...node.data,
+                  hasMessage: false,
+                },
+              })) as AppNode[];
+
+              const updatedEdges = edges.map((edge) => ({
+                ...edge,
+                data: {
+                  ...edge.data,
+                  hasMessage: false,
+                },
+              })) as AppEdge[];
+
+              set({
+                status: 'paused',
+                nodes: updatedNodes,
+                edges: updatedEdges,
+                simulationActiveNodes: [],
+                simulationActiveEdges: [],
+                simulationFailedEdges: newFailedEdges,
+              });
+              return;
+            }
           } else {
             // Flow has reached sink nodes, stop simulation automatically
             stopInterval();
             set({ status: 'paused' });
-            // Alert user that simulation finished by emptying active list
             set({
               simulationActiveNodes: [],
               simulationActiveEdges: [],
               nodes: nodes.map(n => ({ ...n, data: { ...n.data, hasMessage: false } })) as AppNode[],
               edges: edges.map(e => ({ ...e, data: { ...e.data, hasMessage: false } })) as AppEdge[],
+              simulationActivePayloads: {},
+              simulationFailedEdges: [],
             });
             return;
           }
@@ -667,6 +860,29 @@ export const useStore = create<AppState>((set, get) => {
         
         if (targetNodes.length > 0) {
           nextActiveNodes = Array.from(new Set(targetNodes));
+          
+          // Compute payload on target nodes (merging multiple inputs if applicable)
+          nextActiveNodes.forEach((targetId) => {
+            const incoming = activeEdgesList.filter(e => e.target === targetId);
+            let mergedPayload = '{}';
+            try {
+              const payloadsObj = incoming.map(e => {
+                try {
+                  return JSON.parse(nextActivePayloads[e.id] || '{}');
+                } catch {
+                  return {};
+                }
+              });
+              const combined = Object.assign({}, ...payloadsObj);
+              mergedPayload = JSON.stringify(combined, null, 2);
+            } catch {
+              if (incoming.length > 0) {
+                mergedPayload = nextActivePayloads[incoming[0].id] || '{}';
+              }
+            }
+            nextActivePayloads[targetId] = mergedPayload;
+          });
+
           nextActiveEdges = [];
           nextPhase = 'node';
         } else {
@@ -701,6 +917,8 @@ export const useStore = create<AppState>((set, get) => {
         simulationActiveEdges: nextActiveEdges,
         simulationPhase: nextPhase,
         currentStep: get().currentStep + 1,
+        simulationActivePayloads: nextActivePayloads,
+        simulationFailedEdges: newFailedEdges, // set failed edges for current step to flash red
       });
     },
 
