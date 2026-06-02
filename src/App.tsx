@@ -3,6 +3,7 @@ import Navbar from './components/Navbar';
 import Sidebar from './components/Sidebar';
 import FlowCanvas from './components/FlowCanvas';
 import ControlPanel from './components/ControlPanel';
+import RoutingModal from './components/RoutingModal';
 
 function App() {
   return (
@@ -19,6 +20,9 @@ function App() {
             
             {/* Floating Simulation HUD Control Console */}
             <ControlPanel />
+
+            {/* Configures routing tables on-connection creation */}
+            <RoutingModal />
           </div>
         </ReactFlowProvider>
 

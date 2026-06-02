@@ -420,7 +420,7 @@ export default function Sidebar() {
                         const target = nodes.find((n) => n.id === edge.target);
                         const targetName = target ? target.data.label : 'Unknown Node';
                         const protocol = edge.data?.connectionType?.toUpperCase() || 'REST';
-                        const isChecked = selectedNode.data.routingTable?.[selectedInboundId]?.[edge.id] !== false;
+                        const isChecked = selectedNode.data.routingTable?.[selectedInboundId]?.[edge.id] === true;
 
                         return (
                           <div key={edge.id} className="flex items-center justify-between text-xs text-slate-300 py-0.5">

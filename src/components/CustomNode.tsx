@@ -76,6 +76,20 @@ const CustomNode = ({ id, data, selected }: NodeProps<any>) => {
     state.activeMessages.find(m => m.locationId === id && m.locationType === 'node')?.payload
   );
 
+  const mode = useStore((state) => state.mode);
+  const setMode = useStore((state) => state.setMode);
+  const startSimulation = useStore((state) => state.startSimulation);
+  const setTriggerNode = useStore((state) => state.setTriggerNode);
+
+  const handleStartClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (mode === 'edit') {
+      setTriggerNode(id);
+      setMode('simulation');
+      startSimulation();
+    }
+  };
+
   return (
     <div
       className={`relative w-64 rounded-xl border bg-slate-900/90 p-4 text-slate-100 shadow-2xl backdrop-blur-md transition-all duration-300 ${
@@ -95,9 +109,19 @@ const CustomNode = ({ id, data, selected }: NodeProps<any>) => {
       {/* Node Header */}
       <div className="flex items-center justify-between pb-2">
         <div className="flex items-center gap-2">
-          <div className={`rounded-lg p-1.5 ${config.bgClass} ${config.colorClass}`}>
-            <Icon size={18} />
-          </div>
+          {nodeData.type === 'start' && mode === 'edit' ? (
+            <button
+              onClick={handleStartClick}
+              title="Run Simulation"
+              className={`rounded-lg p-1.5 transition-all duration-200 cursor-pointer ${config.bgClass} ${config.colorClass} hover:bg-indigo-600 hover:text-white hover:scale-110 active:scale-95`}
+            >
+              <Icon size={18} />
+            </button>
+          ) : (
+            <div className={`rounded-lg p-1.5 ${config.bgClass} ${config.colorClass}`}>
+              <Icon size={18} />
+            </div>
+          )}
           <div>
             <h4 className="font-semibold text-sm text-slate-200 tracking-wide truncate max-w-[110px]">
               {nodeData.label}

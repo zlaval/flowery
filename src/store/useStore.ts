@@ -105,6 +105,22 @@ interface AppState {
   stopSimulation: () => void;
   stepSimulation: () => void;
   setSpeed: (speed: number) => void;
+
+  // Routing Modal States
+  routingModal: {
+    isOpen: boolean;
+    edgeId: string;
+    sourceId: string;
+    targetId: string;
+  } | null;
+  setRoutingModal: (modal: { isOpen: boolean; edgeId: string; sourceId: string; targetId: string } | null) => void;
+  saveConnectionRouting: (
+    sourceId: string,
+    targetId: string,
+    edgeId: string,
+    sourceRoutes: Record<string, boolean>,
+    targetRoutes: Record<string, boolean>
+  ) => void;
 }
 
 // Timer reference for the simulation loop
@@ -442,6 +458,7 @@ export const useStore = create<AppState>((set, get) => {
     currentStep: 0,
     activeMessages: [],
     simulationFailedEdges: [],
+    routingModal: null,
 
     // Flow handlers
     onNodesChange: (changes) => {
@@ -457,6 +474,12 @@ export const useStore = create<AppState>((set, get) => {
     },
 
     onConnect: (connection) => {
+      // Prevent duplicate directed connections between the same source and target nodes
+      const duplicate = get().edges.some(
+        (edge) => edge.source === connection.source && edge.target === connection.target
+      );
+      if (duplicate) return;
+
       const edgeId = `edge-${Date.now()}`;
       const newEdge: AppEdge = {
         id: edgeId,
@@ -474,20 +497,20 @@ export const useStore = create<AppState>((set, get) => {
         },
       };
 
-      // V3 Refinement: Dynamically update source node routingTable, default to true
+      // V3 Refinement: Dynamically update source node routingTable, default to false (opt-in)
       const updatedNodes = get().nodes.map((node) => {
         if (node.id === connection.source) {
           const routingTable = { ...node.data.routingTable };
           
-          // Append new Edge ID to all existing inbound connection keys in the table
+          // Append new Edge ID to all existing inbound connection keys in the table, default to false
           const keys = Object.keys(routingTable);
           if (keys.length === 0) {
-            routingTable['trigger'] = { [edgeId]: true };
+            routingTable['trigger'] = { [edgeId]: false };
           } else {
             keys.forEach((key) => {
               routingTable[key] = {
                 ...routingTable[key],
-                [edgeId]: true,
+                [edgeId]: false,
               };
             });
           }
@@ -497,11 +520,20 @@ export const useStore = create<AppState>((set, get) => {
             data: { ...node.data, routingTable },
           };
         } else if (node.id === connection.target) {
-          // Initialize routing table mapping row for the target node receiving edgeId
+          // Initialize routing table mapping row for the target node receiving edgeId, defaulting target's outbound connections to false
           const routingTable = { ...node.data.routingTable };
-          if (!routingTable[edgeId]) {
-            routingTable[edgeId] = {};
-          }
+          
+          const outgoingEdges = get().edges.filter((e) => e.source === node.id);
+          const targetRoutes: Record<string, boolean> = {};
+          outgoingEdges.forEach((e) => {
+            targetRoutes[e.id] = false;
+          });
+
+          routingTable[edgeId] = {
+            ...routingTable[edgeId],
+            ...targetRoutes,
+          };
+
           return {
             ...node,
             data: { ...node.data, routingTable },
@@ -513,6 +545,12 @@ export const useStore = create<AppState>((set, get) => {
       set({
         edges: [...get().edges, newEdge],
         nodes: updatedNodes,
+        routingModal: {
+          isOpen: true,
+          edgeId,
+          sourceId: connection.source,
+          targetId: connection.target,
+        },
       });
     },
 
@@ -804,6 +842,46 @@ export const useStore = create<AppState>((set, get) => {
       });
     },
 
+    setRoutingModal: (modal) => {
+      set({ routingModal: modal });
+    },
+
+    saveConnectionRouting: (sourceId, targetId, edgeId, sourceRoutes, targetRoutes) => {
+      set({
+        nodes: get().nodes.map((node) => {
+          if (node.id === sourceId) {
+            const routingTable = { ...node.data.routingTable };
+            Object.keys(sourceRoutes).forEach((inboundId) => {
+              if (!routingTable[inboundId]) {
+                routingTable[inboundId] = {};
+              }
+              routingTable[inboundId] = {
+                ...routingTable[inboundId],
+                [edgeId]: sourceRoutes[inboundId],
+              };
+            });
+            return {
+              ...node,
+              data: { ...node.data, routingTable },
+            };
+          }
+          if (node.id === targetId) {
+            const routingTable = { ...node.data.routingTable };
+            routingTable[edgeId] = {
+              ...routingTable[edgeId],
+              ...targetRoutes,
+            };
+            return {
+              ...node,
+              data: { ...node.data, routingTable },
+            };
+          }
+          return node;
+        }) as AppNode[],
+        routingModal: null,
+      });
+    },
+
     startSimulation: () => {
       const { triggerNodeId, nodes } = get();
       
@@ -920,8 +998,8 @@ export const useStore = create<AppState>((set, get) => {
               // Resolve inbound key: source connection ID or 'trigger'
               const inboundKey = packet.sourceEdgeId || 'trigger';
 
-              // Opt-out check: check specific nested routingTable cell, default to true
-              const isPathAllowed = sourceNode?.data.routingTable?.[inboundKey]?.[edge.id] !== false;
+              // Opt-in check: check specific nested routingTable cell, default to false
+              const isPathAllowed = sourceNode?.data.routingTable?.[inboundKey]?.[edge.id] === true;
               if (!isPathAllowed) {
                 // Ignore completely - opt out
                 return;
