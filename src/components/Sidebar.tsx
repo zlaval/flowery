@@ -5,7 +5,6 @@ import {
   Server,
   Database,
   MessageSquare,
-  Globe,
   Trash2,
   AlertCircle,
   Check,
@@ -35,7 +34,6 @@ export default function Sidebar() {
 
   const [nodeLabel, setNodeLabel] = useState('');
   const [nodeDesc, setNodeDesc] = useState('');
-  const [nodeUrl, setNodeUrl] = useState('');
   
   // V2 node response template states
   const [nodeResponseTemplate, setNodeResponseTemplate] = useState('');
@@ -66,7 +64,6 @@ export default function Sidebar() {
     if (selectedNode) {
       setNodeLabel(selectedNode.data.label || '');
       setNodeDesc(selectedNode.data.description || '');
-      setNodeUrl(selectedNode.data.url || '');
       setNodeResponseTemplate(selectedNode.data.responseTemplate || '');
       setNodeJsonError(null);
       
@@ -173,7 +170,6 @@ export default function Sidebar() {
     { type: 'microservice', label: 'Microservice', icon: Server, color: 'text-emerald-400 border-emerald-500/20 bg-emerald-950/10' },
     { type: 'database', label: 'Database', icon: Database, color: 'text-blue-400 border-blue-500/20 bg-blue-950/10' },
     { type: 'kafka', label: 'Message Queue', icon: MessageSquare, color: 'text-purple-400 border-purple-500/20 bg-purple-950/10' },
-    { type: 'api', label: 'External API', icon: Globe, color: 'text-amber-400 border-amber-500/20 bg-amber-950/10' },
     { type: 'function', label: 'Function', icon: Code2, color: 'text-pink-400 border-pink-500/20 bg-pink-950/10' },
   ];
 
@@ -306,25 +302,7 @@ export default function Sidebar() {
                 />
               </div>
 
-              {/* Dynamic Type-specific fields */}
 
-              {selectedNode.data.type === 'api' && (
-                <div className="space-y-1.5">
-                  <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
-                    Base URL
-                  </label>
-                  <input
-                    type="text"
-                    value={nodeUrl}
-                    disabled={mode === 'simulation'}
-                    onChange={(e) => {
-                      setNodeUrl(e.target.value);
-                      handleNodeUpdate('url', e.target.value);
-                    }}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 disabled:opacity-50"
-                  />
-                </div>
-              )}
 
               {/* V2 Node Response Template Editor */}
               <div className="space-y-1.5 pt-2 border-t border-slate-800/80">

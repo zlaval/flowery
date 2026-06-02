@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import { Handle, Position } from '@xyflow/react';
 import type { NodeProps } from '@xyflow/react';
-import { Server, Database, MessageSquare, Globe, Flame, Play, Code2 } from 'lucide-react';
+import { Server, Database, MessageSquare, Flame, Play, Code2 } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import type { NodeType, CustomNodeData } from '../store/useStore';
 
@@ -48,14 +48,7 @@ const typeConfigs: Record<
     icon: MessageSquare,
     typeName: 'Message Queue',
   },
-  api: {
-    colorClass: 'text-amber-400',
-    borderClass: 'border-amber-500/30',
-    bgClass: 'bg-amber-950/20',
-    glowClass: 'shadow-amber-500/20 ring-amber-500/40',
-    icon: Globe,
-    typeName: 'External API',
-  },
+
   function: {
     colorClass: 'text-pink-400',
     borderClass: 'border-pink-500/30',
@@ -154,17 +147,7 @@ const CustomNode = ({ id, data, selected }: NodeProps<any>) => {
         </div>
       </div>
 
-      {/* Node Details (depends on type) */}
-      {nodeData.type === 'api' && (
-        <div className="mt-2.5 space-y-1 text-[11px] font-mono text-slate-400">
-          <div className="flex flex-col gap-0.5">
-            <span>Base URL:</span>
-            <span className="text-slate-300 font-semibold truncate block" title={nodeData.url}>
-              {nodeData.url || 'https://api.com'}
-            </span>
-          </div>
-        </div>
-      )}
+
 
       {/* Telemetry live snippet if node is holding message */}
       {nodeData.hasMessage && activePayload && (

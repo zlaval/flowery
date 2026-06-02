@@ -11,7 +11,7 @@ import type {
   Edge,
 } from '@xyflow/react';
 
-export type NodeType = 'start' | 'microservice' | 'database' | 'kafka' | 'api' | 'function';
+export type NodeType = 'start' | 'microservice' | 'database' | 'kafka' | 'function';
 export type ConnectionType =
   | 'rest'
   | 'grpc'
@@ -592,7 +592,6 @@ export const useStore = create<AppState>((set, get) => {
         microservice: 'New Service',
         database: 'New Database',
         kafka: 'Kafka Queue',
-        api: 'External API',
         function: 'Function',
       };
 
@@ -601,7 +600,6 @@ export const useStore = create<AppState>((set, get) => {
         microservice: { description: 'Custom Microservice API endpoint.', responseTemplate: '', routingTable: {} },
         database: { description: 'Relational Database Instance.', responseTemplate: '', routingTable: {} },
         kafka: { description: 'Kafka Stream / Topic.', responseTemplate: '', routingTable: {} },
-        api: { url: 'https://api.example.com/v1', description: 'External third-party API provider.', responseTemplate: '', routingTable: {} },
         function: { description: 'Serverless Function.', responseTemplate: '', routingTable: {} },
       };
 
