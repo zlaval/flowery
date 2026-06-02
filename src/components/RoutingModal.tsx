@@ -19,17 +19,35 @@ export default function RoutingModal() {
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
-  // Sync state when modal opens
+  const isInboundFromStart = (inboundEdgeId: string) => {
+    const edge = edges.find((e) => e.id === inboundEdgeId);
+    if (!edge) return false;
+    const srcNode = nodes.find((n) => n.id === edge.source);
+    return srcNode?.data.type === 'start';
+  };
+
+  // Sync state when modal opens or step transitions
   useEffect(() => {
     if (routingModal) {
-      const { targetId, edgeId } = routingModal;
-      const targetNode = nodes.find((n) => n.id === targetId);
-      if (targetNode) {
-        setLocalRoutingTable(targetNode.data.routingTable || {});
+      const { sourceId, targetId, edgeId, step } = routingModal;
+      if (step === 'source') {
+        const sourceNode = nodes.find((n) => n.id === sourceId);
+        if (sourceNode) {
+          setLocalRoutingTable(sourceNode.data.routingTable || {});
+          const sourceInbounds = edges.filter((e) => e.target === sourceId);
+          // Default to first non-start inbound, or first inbound
+          const defaultInbound = sourceInbounds.find((e) => !isInboundFromStart(e.id))?.id || sourceInbounds[0]?.id || '';
+          setSelectedInboundId(defaultInbound);
+        }
+      } else {
+        const targetNode = nodes.find((n) => n.id === targetId);
+        if (targetNode) {
+          setLocalRoutingTable(targetNode.data.routingTable || {});
+        }
+        setSelectedInboundId(edgeId);
       }
-      setSelectedInboundId(edgeId);
     }
-  }, [routingModal, nodes]);
+  }, [routingModal, nodes, edges]);
 
   // Handle drag movement of the modal
   useEffect(() => {
@@ -77,17 +95,21 @@ export default function RoutingModal() {
 
   if (!routingModal || !routingModal.isOpen) return null;
 
-  const { targetId } = routingModal;
+  const { sourceId, targetId, step } = routingModal;
+  const sourceNode = nodes.find((n) => n.id === sourceId);
   const targetNode = nodes.find((n) => n.id === targetId);
 
-  if (!targetNode) return null;
+  if (!sourceNode || !targetNode) return null;
 
-  // Inbound connections to Target Node B
-  const targetInbounds = edges.filter((e) => e.target === targetId);
-  // Outbound connections from Target Node B (excluding self loops)
-  const targetOutbounds = edges.filter((e) => e.source === targetId && e.target !== targetId);
+  const activeNode = step === 'source' ? sourceNode : targetNode;
+  const activeNodeId = step === 'source' ? sourceId : targetId;
 
-  const handleToggleTarget = (outboundId: string) => {
+  // Inbound connections to the active node
+  const activeInbounds = edges.filter((e) => e.target === activeNodeId);
+  // Outbound connections from the active node (excluding self loops)
+  const activeOutbounds = edges.filter((e) => e.source === activeNodeId && e.target !== activeNodeId);
+
+  const handleToggleOutbound = (outboundId: string) => {
     setLocalRoutingTable((prev) => {
       const row = prev[selectedInboundId] || {};
       return {
@@ -101,8 +123,23 @@ export default function RoutingModal() {
   };
 
   const handleSave = () => {
-    updateNodeData(targetId, { routingTable: localRoutingTable });
-    setRoutingModal(null);
+    updateNodeData(activeNodeId, { routingTable: localRoutingTable });
+
+    if (step === 'source') {
+      const targetOutbounds = edges.filter((e) => e.source === targetId && e.target !== targetId);
+      const isTargetConfigurable = targetOutbounds.length > 0;
+
+      if (isTargetConfigurable) {
+        setRoutingModal({
+          ...routingModal,
+          step: 'target',
+        });
+      } else {
+        setRoutingModal(null);
+      }
+    } else {
+      setRoutingModal(null);
+    }
   };
 
   return (
@@ -126,10 +163,10 @@ export default function RoutingModal() {
             </div>
             <div>
               <h3 className="font-bold text-sm text-slate-100 tracking-wide uppercase m-0">
-                Routing Path Configurator
+                {step === 'source' ? 'Routing Config - Input Side' : 'Routing Config - Output Side'}
               </h3>
               <p className="text-[10px] text-slate-500 font-mono m-0 mt-0.5">
-                Node: {targetNode.data.label}
+                Node: {activeNode.data.label}
               </p>
             </div>
           </div>
@@ -154,7 +191,7 @@ export default function RoutingModal() {
                 onChange={(e) => setSelectedInboundId(e.target.value)}
                 className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3.5 py-2 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 cursor-pointer appearance-none"
               >
-                {targetInbounds.map((inbound) => {
+                {activeInbounds.map((inbound) => {
                   const src = nodes.find((n) => n.id === inbound.source);
                   const srcName = src ? src.data.label : 'Unknown';
                   const proto = inbound.data?.connectionType?.toUpperCase() || 'REST';
@@ -180,10 +217,10 @@ export default function RoutingModal() {
               Outbound Checkbox Checklist
             </h4>
             <p className="text-[10px] text-slate-500 leading-normal m-0 pl-2.5">
-              Select which outbound destinations from {targetNode.data.label} are active when messages arrive from this input:
+              Select which outbound destinations from {activeNode.data.label} are active when messages arrive from this input:
             </p>
             <div className="space-y-1.5 pl-2.5 mt-1">
-              {targetOutbounds.map((edge) => {
+              {activeOutbounds.map((edge) => {
                 const tgt = nodes.find((n) => n.id === edge.target);
                 const tgtName = tgt ? tgt.data.label : 'Unknown';
                 const proto = edge.data?.connectionType?.toUpperCase() || 'REST';
@@ -192,7 +229,7 @@ export default function RoutingModal() {
                 return (
                   <div
                     key={edge.id}
-                    onClick={() => handleToggleTarget(edge.id)}
+                    onClick={() => handleToggleOutbound(edge.id)}
                     className={`flex items-center justify-between p-2 rounded-lg border text-xs cursor-pointer transition-all duration-200 ${
                       isSelected
                         ? 'bg-indigo-950/20 border-indigo-500/30 text-indigo-300'
@@ -208,7 +245,7 @@ export default function RoutingModal() {
                   </div>
                 );
               })}
-              {targetOutbounds.length === 0 && (
+              {activeOutbounds.length === 0 && (
                 <div className="text-[10px] text-slate-500 italic p-2 border border-dashed border-slate-800/40 rounded-lg bg-slate-950/20">
                   No outgoing paths from this node.
                 </div>
@@ -229,7 +266,9 @@ export default function RoutingModal() {
             onClick={handleSave}
             className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/10 hover:shadow-indigo-600/20 transition-all cursor-pointer"
           >
-            Apply Routing
+            {step === 'source' && edges.filter((e) => e.source === targetId && e.target !== targetId).length > 0
+              ? 'Next (Target Node)'
+              : 'Apply Routing'}
           </button>
         </div>
       </div>

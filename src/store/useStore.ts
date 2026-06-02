@@ -112,15 +112,9 @@ interface AppState {
     edgeId: string;
     sourceId: string;
     targetId: string;
+    step: 'source' | 'target';
   } | null;
-  setRoutingModal: (modal: { isOpen: boolean; edgeId: string; sourceId: string; targetId: string } | null) => void;
-  saveConnectionRouting: (
-    sourceId: string,
-    targetId: string,
-    edgeId: string,
-    sourceRoutes: Record<string, boolean>,
-    targetRoutes: Record<string, boolean>
-  ) => void;
+  setRoutingModal: (modal: { isOpen: boolean; edgeId: string; sourceId: string; targetId: string; step: 'source' | 'target' } | null) => void;
 
   // Rename Modal States
   renameModal: {
@@ -567,8 +561,18 @@ export const useStore = create<AppState>((set, get) => {
       const sourceInbounds = get().edges.filter((e) => e.target === connection.source && e.source !== connection.source);
       const targetOutbounds = get().edges.filter((e) => e.source === connection.target && e.target !== connection.target);
 
-      // popup condition: source is not start, source has inbound, target has outbound
-      const shouldShowPopup = !isSourceStart && sourceInbounds.length > 0 && targetOutbounds.length > 0;
+      // Source is configurable if it is not start, and has at least one inbound connection NOT from start
+      const isSourceConfigurable = 
+        !isSourceStart && 
+        sourceInbounds.some((e) => !isInboundFromStart(e.id));
+
+      // Target is configurable if the new connection does not come from start, and target has outbound connections
+      const isTargetConfigurable = 
+        !isSourceStart && 
+        targetOutbounds.length > 0;
+
+      const shouldShowPopup = isSourceConfigurable || isTargetConfigurable;
+      const initialStep = isSourceConfigurable ? 'source' : 'target';
 
       set({
         edges: [...get().edges, newEdge],
@@ -579,6 +583,7 @@ export const useStore = create<AppState>((set, get) => {
               edgeId,
               sourceId: connection.source,
               targetId: connection.target,
+              step: initialStep,
             }
           : null,
       });
@@ -878,42 +883,6 @@ export const useStore = create<AppState>((set, get) => {
 
     setRenameModal: (modal) => {
       set({ renameModal: modal });
-    },
-
-    saveConnectionRouting: (sourceId, targetId, edgeId, sourceRoutes, targetRoutes) => {
-      set({
-        nodes: get().nodes.map((node) => {
-          if (node.id === sourceId) {
-            const routingTable = { ...node.data.routingTable };
-            Object.keys(sourceRoutes).forEach((inboundId) => {
-              if (!routingTable[inboundId]) {
-                routingTable[inboundId] = {};
-              }
-              routingTable[inboundId] = {
-                ...routingTable[inboundId],
-                [edgeId]: sourceRoutes[inboundId],
-              };
-            });
-            return {
-              ...node,
-              data: { ...node.data, routingTable },
-            };
-          }
-          if (node.id === targetId) {
-            const routingTable = { ...node.data.routingTable };
-            routingTable[edgeId] = {
-              ...routingTable[edgeId],
-              ...targetRoutes,
-            };
-            return {
-              ...node,
-              data: { ...node.data, routingTable },
-            };
-          }
-          return node;
-        }) as AppNode[],
-        routingModal: null,
-      });
     },
 
     startSimulation: () => {
