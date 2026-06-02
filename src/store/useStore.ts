@@ -501,12 +501,6 @@ export const useStore = create<AppState>((set, get) => {
       };
 
       // V3 Refinement: Dynamically update source node routingTable
-      const isInboundFromStart = (inboundEdgeId: string) => {
-        const edge = get().edges.find((e) => e.id === inboundEdgeId);
-        if (!edge) return false;
-        const srcNode = get().nodes.find((n) => n.id === edge.source);
-        return srcNode?.data.type === 'start';
-      };
 
       const sourceNode = get().nodes.find((n) => n.id === connection.source);
       const isSourceStart = sourceNode?.data.type === 'start';
@@ -523,10 +517,9 @@ export const useStore = create<AppState>((set, get) => {
           } else {
             keys.forEach((key) => {
               const isStart = node.data.type === 'start';
-              const isFromStart = isStart || isInboundFromStart(key);
               routingTable[key] = {
                 ...routingTable[key],
-                [edgeId]: isFromStart, // true if inbound originates from Start, false otherwise
+                [edgeId]: isStart, // true only if source node is Start itself
               };
             });
           }
@@ -542,7 +535,7 @@ export const useStore = create<AppState>((set, get) => {
           const outgoingEdges = get().edges.filter((e) => e.source === node.id && e.target !== node.id);
           const targetRoutes: Record<string, boolean> = {};
           outgoingEdges.forEach((e) => {
-            targetRoutes[e.id] = isSourceStart; // true if inbound originates from Start, false otherwise
+            targetRoutes[e.id] = false; // Always false by default for target node outbounds
           });
 
           routingTable[edgeId] = {
@@ -561,10 +554,10 @@ export const useStore = create<AppState>((set, get) => {
       const sourceInbounds = get().edges.filter((e) => e.target === connection.source && e.source !== connection.source);
       const targetOutbounds = get().edges.filter((e) => e.source === connection.target && e.target !== connection.target);
 
-      // Source is configurable if it is not start, and has at least one inbound connection NOT from start
+      // Source is configurable if it is not start, and has at least one inbound connection
       const isSourceConfigurable = 
         !isSourceStart && 
-        sourceInbounds.some((e) => !isInboundFromStart(e.id));
+        sourceInbounds.length > 0;
 
       // Target is configurable if the new connection does not come from start, and target has outbound connections
       const isTargetConfigurable = 
@@ -984,8 +977,7 @@ export const useStore = create<AppState>((set, get) => {
             }];
             nextPhase = 'node';
           } else {
-            stopInterval();
-            set({ status: 'paused' });
+            get().stopSimulation();
             return;
           }
         } else {
@@ -1075,25 +1067,7 @@ export const useStore = create<AppState>((set, get) => {
             nextPhase = 'edge';
           } else {
             // All paths are blocked
-            stopInterval();
-            
-            const updatedNodes = nodes.map((node) => ({
-              ...node,
-              data: { ...node.data, hasMessage: false },
-            })) as AppNode[];
-
-            const updatedEdges = edges.map((edge) => ({
-              ...edge,
-              data: { ...edge.data, hasMessage: false },
-            })) as AppEdge[];
-
-            set({
-              status: 'paused',
-              nodes: updatedNodes,
-              edges: updatedEdges,
-              activeMessages: [],
-              simulationFailedEdges: newFailedEdges,
-            });
+            get().stopSimulation();
             return;
           }
         }
@@ -1153,8 +1127,7 @@ export const useStore = create<AppState>((set, get) => {
 
           nextPhase = 'node';
         } else {
-          stopInterval();
-          set({ status: 'paused' });
+          get().stopSimulation();
           return;
         }
       }
