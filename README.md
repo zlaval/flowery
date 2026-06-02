@@ -1,3 +1,5 @@
+ #MVP - under development
+
 # Flowery - Visual Architecture Planner & Message Flow Simulator
 
 Flowery is an interactive visual system architecture designer and real-time message flow simulator. Built with a premium, dark-themed developer dashboard, it allows developers and architects to model microservice dependencies, configure endpoint parameters, define JSON payloads, and simulate parallel message delivery runs across various network protocols.
