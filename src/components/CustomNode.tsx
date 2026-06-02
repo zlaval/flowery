@@ -74,11 +74,6 @@ const CustomNode = ({ id, data, selected }: NodeProps<any>) => {
   const startSimulation = useStore((state) => state.startSimulation);
   const setTriggerNode = useStore((state) => state.setTriggerNode);
 
-  // Check if Start node already has an outbound edge
-  const hasOutboundEdge = useStore((state) =>
-    nodeData.type === 'start' && state.edges.some((e) => e.source === id)
-  );
-
   // Active handles config
   const activeHandles = nodeData.activeHandles || (
     nodeData.type === 'start' ? ['output'] : ['input', 'output']
@@ -126,7 +121,6 @@ const CustomNode = ({ id, data, selected }: NodeProps<any>) => {
           position={Position.Right}
           id="output"
           style={{ top: '50%' }}
-          isConnectable={!hasOutboundEdge}
           className="!h-3 !w-3 !bg-orange-600 hover:!bg-orange-500 hover:scale-125 border border-slate-950 shadow rounded-full transition-all cursor-crosshair z-20"
         />
       ) : (
