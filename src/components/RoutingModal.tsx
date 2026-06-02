@@ -163,10 +163,10 @@ export default function RoutingModal() {
             </div>
             <div>
               <h3 className="font-bold text-sm text-slate-100 tracking-wide uppercase m-0">
-                {step === 'source' ? 'Routing Config - Input Side' : 'Routing Config - Output Side'}
+                Node {activeNode.data.label} Routing Config
               </h3>
               <p className="text-[10px] text-slate-500 font-mono m-0 mt-0.5">
-                Node: {activeNode.data.label}
+                {step === 'source' ? 'Input Side Configuration' : 'Output Side Configuration'}
               </p>
             </div>
           </div>
@@ -217,7 +217,7 @@ export default function RoutingModal() {
               Outbound Checkbox Checklist
             </h4>
             <p className="text-[10px] text-slate-500 leading-normal m-0 pl-2.5">
-              Select which outbound destinations from {activeNode.data.label} are active when messages arrive from this input:
+              Select which outbound destinations from <span className="text-amber-400 font-semibold">{activeNode.data.label}</span> are active when messages arrive from this input:
             </p>
             <div className="space-y-1.5 pl-2.5 mt-1">
               {activeOutbounds.map((edge) => {
