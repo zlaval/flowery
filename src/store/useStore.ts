@@ -121,6 +121,14 @@ interface AppState {
     sourceRoutes: Record<string, boolean>,
     targetRoutes: Record<string, boolean>
   ) => void;
+
+  // Rename Modal States
+  renameModal: {
+    isOpen: boolean;
+    nodeId: string;
+    currentLabel: string;
+  } | null;
+  setRenameModal: (modal: { isOpen: boolean; nodeId: string; currentLabel: string } | null) => void;
 }
 
 // Timer reference for the simulation loop
@@ -459,6 +467,7 @@ export const useStore = create<AppState>((set, get) => {
     activeMessages: [],
     simulationFailedEdges: [],
     routingModal: null,
+    renameModal: null,
 
     // Flow handlers
     onNodesChange: (changes) => {
@@ -855,6 +864,10 @@ export const useStore = create<AppState>((set, get) => {
 
     setRoutingModal: (modal) => {
       set({ routingModal: modal });
+    },
+
+    setRenameModal: (modal) => {
+      set({ renameModal: modal });
     },
 
     saveConnectionRouting: (sourceId, targetId, edgeId, sourceRoutes, targetRoutes) => {

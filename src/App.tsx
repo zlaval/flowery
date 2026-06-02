@@ -4,6 +4,7 @@ import Sidebar from './components/Sidebar';
 import FlowCanvas from './components/FlowCanvas';
 import ControlPanel from './components/ControlPanel';
 import RoutingModal from './components/RoutingModal';
+import RenameModal from './components/RenameModal';
 
 function App() {
   return (
@@ -23,6 +24,9 @@ function App() {
 
             {/* Configures routing tables on-connection creation */}
             <RoutingModal />
+
+            {/* Rename popup on node click */}
+            <RenameModal />
           </div>
         </ReactFlowProvider>
 

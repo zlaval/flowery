@@ -43,6 +43,7 @@ export default function FlowCanvas() {
     duplicateNode,
     deleteNode,
     setTriggerNode,
+    setRenameModal,
   } = useStore();
 
   const [menu, setMenu] = useState<MenuState>({ visible: false, x: 0, y: 0 });
@@ -50,8 +51,15 @@ export default function FlowCanvas() {
   const handleNodeClick = useCallback<NodeMouseHandler>(
     (_, node) => {
       selectElement({ type: 'node', id: node.id });
+      if (mode === 'edit') {
+        setRenameModal({
+          isOpen: true,
+          nodeId: node.id,
+          currentLabel: (node.data as any).label || '',
+        });
+      }
     },
-    [selectElement]
+    [selectElement, mode, setRenameModal]
   );
 
   const handleEdgeClick = useCallback<EdgeMouseHandler>(
