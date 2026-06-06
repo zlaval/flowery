@@ -94,6 +94,12 @@ interface AppState {
   deleteEdge: (id: string) => void;
   toggleNodeHandle: (nodeId: string, handleId: string) => void;
   clearCanvas: () => void;
+  loadConfiguration: (config: {
+    version?: string;
+    triggerNodeId: string | null;
+    nodes: AppNode[];
+    edges: AppEdge[];
+  }) => void;
   
   // Selection actions
   selectElement: (element: { type: 'node' | 'edge'; id: string } | null) => void;
@@ -829,6 +835,42 @@ export const useStore = create<AppState>((set, get) => {
         edges: [],
         selectedElement: null,
         triggerNodeId: 'node-start',
+        status: 'stopped',
+        mode: 'edit',
+        simulationPhase: 'node',
+        currentStep: 0,
+        activeMessages: [],
+        simulationFailedEdges: [],
+      });
+    },
+
+    loadConfiguration: (config) => {
+      stopInterval();
+      if (!config || !Array.isArray(config.nodes) || !Array.isArray(config.edges)) {
+        throw new Error("Invalid configuration structure.");
+      }
+
+      const sanitizedNodes = config.nodes.map(node => ({
+        ...node,
+        data: {
+          ...node.data,
+          hasMessage: false
+        }
+      })) as AppNode[];
+
+      const sanitizedEdges = config.edges.map(edge => ({
+        ...edge,
+        data: {
+          ...edge.data,
+          hasMessage: false
+        }
+      })) as AppEdge[];
+
+      set({
+        nodes: sanitizedNodes,
+        edges: sanitizedEdges,
+        triggerNodeId: config.triggerNodeId || (sanitizedNodes.find(n => n.data.type === 'start')?.id || null),
+        selectedElement: null,
         status: 'stopped',
         mode: 'edit',
         simulationPhase: 'node',

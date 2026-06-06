@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useStore } from '../store/useStore';
-import { Plus, Save, FolderOpen, Network, Edit3, Cpu, Sparkles } from 'lucide-react';
+import { Plus, Save, FolderOpen, Network, Edit3, Cpu, Sparkles, Cloud } from 'lucide-react';
 
 export default function Navbar() {
-  const { mode, setMode, clearCanvas, nodes, edges } = useStore();
+  const { mode, setMode, clearCanvas, nodes, edges, triggerNodeId, loadConfiguration } = useStore();
   const [toast, setToast] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Auto-clear toast after 3 seconds
   useEffect(() => {
@@ -25,8 +26,89 @@ export default function Navbar() {
     }
   };
 
-  const handleMockAction = (actionName: string) => {
-    setToast(`${actionName}: Feature coming soon in the next version!`);
+  const handleSave = () => {
+    const config = {
+      version: '1.0',
+      triggerNodeId,
+      nodes,
+      edges,
+    };
+
+    // Output to console in JSON format
+    console.log('=== FLOWERY ARCHITECTURE CONFIGURATION ===');
+    console.log(JSON.stringify(config, null, 2));
+    console.log('==========================================');
+
+    // Also download as file to make it easily reloadable/testable locally
+    try {
+      const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(config, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute('href', dataStr);
+      downloadAnchor.setAttribute('download', 'flowery-architecture.json');
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+
+      setToast('Configuration saved (printed to console & downloaded).');
+    } catch (error) {
+      console.error('Failed to download config file', error);
+      setToast('Configuration saved (printed to console).');
+    }
+  };
+
+  const handleSaveToServer = async () => {
+    const config = {
+      version: '1.0',
+      triggerNodeId,
+      nodes,
+      edges,
+    };
+
+    try {
+      const response = await fetch('http://localhost:8080/api/configs', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(config),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Server returned ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log('Saved to server successfully:', data);
+
+      if (data.id) {
+        await navigator.clipboard.writeText(data.id);
+        setToast(`Saved to server! ID copied to clipboard: ${data.id}`);
+      } else {
+        setToast('Saved to server successfully!');
+      }
+    } catch (error: any) {
+      console.error('Failed to save to server:', error);
+      setToast(`Failed to save to server: ${error.message || 'Network error'}`);
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const json = JSON.parse(event.target?.result as string);
+        loadConfiguration(json);
+        setToast('Configuration loaded successfully.');
+      } catch (err) {
+        console.error(err);
+        setToast('Failed to load configuration: invalid JSON file.');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
   };
 
   return (
@@ -74,6 +156,13 @@ export default function Navbar() {
 
       {/* Top Operations Panel */}
       <div className="flex items-center gap-2">
+        <input
+          type="file"
+          ref={fileInputRef}
+          onChange={handleFileChange}
+          accept=".json"
+          className="hidden"
+        />
         <button
           onClick={handleNew}
           disabled={nodes.length <= 1 && edges.length === 0}
@@ -87,14 +176,21 @@ export default function Navbar() {
           New
         </button>
         <button
-          onClick={() => handleMockAction('Save Architecture')}
+          onClick={handleSave}
           className="flex items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-900 px-3.5 py-1.5 text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:border-slate-700 hover:text-white transition-all duration-200 cursor-pointer"
         >
           <Save size={14} />
-          Save
+          Save Local
         </button>
         <button
-          onClick={() => handleMockAction('Open Design')}
+          onClick={handleSaveToServer}
+          className="flex items-center gap-1.5 rounded-lg border border-indigo-950 bg-indigo-950/40 px-3.5 py-1.5 text-xs font-semibold text-indigo-400 hover:bg-indigo-900/50 hover:border-indigo-800 hover:text-indigo-200 transition-all duration-200 cursor-pointer"
+        >
+          <Cloud size={14} />
+          Save to Server
+        </button>
+        <button
+          onClick={() => fileInputRef.current?.click()}
           className="flex items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-900 px-3.5 py-1.5 text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:border-slate-700 hover:text-white transition-all duration-200 cursor-pointer"
         >
           <FolderOpen size={14} />
