@@ -1,11 +1,10 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useStore } from '../store/useStore';
-import { Plus, Save, FolderOpen, Network, Edit3, Cpu, Sparkles, Cloud } from 'lucide-react';
+import { Plus, Save, Server, Network, Edit3, Cpu, Sparkles } from 'lucide-react';
 
 export default function Navbar() {
-  const { mode, setMode, clearCanvas, nodes, edges, triggerNodeId, loadConfiguration } = useStore();
+  const { mode, setMode, clearCanvas, nodes, edges, triggerNodeId } = useStore();
   const [toast, setToast] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Auto-clear toast after 3 seconds
   useEffect(() => {
@@ -23,36 +22,6 @@ export default function Navbar() {
     if (confirmClear) {
       clearCanvas();
       setToast('Canvas cleared successfully.');
-    }
-  };
-
-  const handleSave = () => {
-    const config = {
-      version: '1.0',
-      triggerNodeId,
-      nodes,
-      edges,
-    };
-
-    // Output to console in JSON format
-    console.log('=== FLOWERY ARCHITECTURE CONFIGURATION ===');
-    console.log(JSON.stringify(config, null, 2));
-    console.log('==========================================');
-
-    // Also download as file to make it easily reloadable/testable locally
-    try {
-      const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(config, null, 2));
-      const downloadAnchor = document.createElement('a');
-      downloadAnchor.setAttribute('href', dataStr);
-      downloadAnchor.setAttribute('download', 'flowery-architecture.json');
-      document.body.appendChild(downloadAnchor);
-      downloadAnchor.click();
-      downloadAnchor.remove();
-
-      setToast('Configuration saved (printed to console & downloaded).');
-    } catch (error) {
-      console.error('Failed to download config file', error);
-      setToast('Configuration saved (printed to console).');
     }
   };
 
@@ -92,25 +61,6 @@ export default function Navbar() {
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const json = JSON.parse(event.target?.result as string);
-        loadConfiguration(json);
-        setToast('Configuration loaded successfully.');
-      } catch (err) {
-        console.error(err);
-        setToast('Failed to load configuration: invalid JSON file.');
-      }
-    };
-    reader.readAsText(file);
-    e.target.value = '';
-  };
-
   return (
     <header className="relative flex h-16 w-full items-center justify-between border-b border-slate-800 bg-slate-950 px-6 z-20">
       {/* Branding Logo */}
@@ -128,7 +78,7 @@ export default function Navbar() {
         </div>
       </div>
 
-      {/* Editor / Simulation Mode Toggle Switch */}
+      {/* Editor / Simulation / Saved Mode Toggle Switch */}
       <div className="flex items-center bg-slate-900 rounded-xl p-1 border border-slate-800">
         <button
           onClick={() => setMode('edit')}
@@ -152,17 +102,21 @@ export default function Navbar() {
           <Cpu size={14} />
           Simulate Mode
         </button>
+        <button
+          onClick={() => setMode('saved')}
+          className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 cursor-pointer ${
+            mode === 'saved'
+              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/10'
+              : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <Server size={14} />
+          Previous Designs
+        </button>
       </div>
 
       {/* Top Operations Panel */}
       <div className="flex items-center gap-2">
-        <input
-          type="file"
-          ref={fileInputRef}
-          onChange={handleFileChange}
-          accept=".json"
-          className="hidden"
-        />
         <button
           onClick={handleNew}
           disabled={nodes.length <= 1 && edges.length === 0}
@@ -176,25 +130,11 @@ export default function Navbar() {
           New
         </button>
         <button
-          onClick={handleSave}
+          onClick={handleSaveToServer}
           className="flex items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-900 px-3.5 py-1.5 text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:border-slate-700 hover:text-white transition-all duration-200 cursor-pointer"
         >
           <Save size={14} />
-          Save Local
-        </button>
-        <button
-          onClick={handleSaveToServer}
-          className="flex items-center gap-1.5 rounded-lg border border-indigo-950 bg-indigo-950/40 px-3.5 py-1.5 text-xs font-semibold text-indigo-400 hover:bg-indigo-900/50 hover:border-indigo-800 hover:text-indigo-200 transition-all duration-200 cursor-pointer"
-        >
-          <Cloud size={14} />
-          Save to Server
-        </button>
-        <button
-          onClick={() => fileInputRef.current?.click()}
-          className="flex items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-900 px-3.5 py-1.5 text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:border-slate-700 hover:text-white transition-all duration-200 cursor-pointer"
-        >
-          <FolderOpen size={14} />
-          Open
+          Save
         </button>
       </div>
 

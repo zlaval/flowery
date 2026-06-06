@@ -5,8 +5,12 @@ import FlowCanvas from './components/FlowCanvas';
 import ControlPanel from './components/ControlPanel';
 import RoutingModal from './components/RoutingModal';
 import RenameModal from './components/RenameModal';
+import SavedConfigurationsList from './components/SavedConfigurationsList';
+import { useStore } from './store/useStore';
 
 function App() {
+  const { mode } = useStore();
+
   return (
     <div className="flex flex-col h-screen w-screen bg-slate-950 overflow-hidden text-slate-100 font-sans">
       {/* Top Header */}
@@ -14,24 +18,30 @@ function App() {
 
       {/* Main Workspace Layout */}
       <div className="flex flex-1 w-full overflow-hidden relative">
-        <ReactFlowProvider>
-          {/* Main Interactive Canvas Area */}
-          <div className="flex-1 h-full w-full relative">
-            <FlowCanvas />
-            
-            {/* Floating Simulation HUD Control Console */}
-            <ControlPanel />
+        {mode === 'saved' ? (
+          <SavedConfigurationsList />
+        ) : (
+          <>
+            <ReactFlowProvider>
+              {/* Main Interactive Canvas Area */}
+              <div className="flex-1 h-full w-full relative">
+                <FlowCanvas />
+                
+                {/* Floating Simulation HUD Control Console */}
+                <ControlPanel />
 
-            {/* Configures routing tables on-connection creation */}
-            <RoutingModal />
+                {/* Configures routing tables on-connection creation */}
+                <RoutingModal />
 
-            {/* Rename popup on node click */}
-            <RenameModal />
-          </div>
-        </ReactFlowProvider>
+                {/* Rename popup on node click */}
+                <RenameModal />
+              </div>
+            </ReactFlowProvider>
 
-        {/* Configuration & inspector Side Panel */}
-        <Sidebar />
+            {/* Configuration & inspector Side Panel */}
+            <Sidebar />
+          </>
+        )}
       </div>
     </div>
   );

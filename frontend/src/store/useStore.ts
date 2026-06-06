@@ -69,7 +69,7 @@ interface AppState {
   onConnect: OnConnect;
   
   // Application Modes
-  mode: 'edit' | 'simulation';
+  mode: 'edit' | 'simulation' | 'saved';
   status: 'stopped' | 'running' | 'paused';
   
   // Selection/Inspection
@@ -105,7 +105,7 @@ interface AppState {
   selectElement: (element: { type: 'node' | 'edge'; id: string } | null) => void;
   
   // Simulation actions
-  setMode: (mode: 'edit' | 'simulation') => void;
+  setMode: (mode: 'edit' | 'simulation' | 'saved') => void;
   setTriggerNode: (nodeId: string) => void;
   toggleRoute: (nodeId: string, inboundId: string, outboundId: string, enabled: boolean) => void; // Toggle routing table paths
   startSimulation: () => void;
@@ -887,7 +887,7 @@ export const useStore = create<AppState>((set, get) => {
 
     // Simulation logic
     setMode: (mode) => {
-      if (mode === 'edit') {
+      if (mode === 'edit' || mode === 'saved') {
         stopInterval();
         // Clear message markers on elements
         const resetNodes = get().nodes.map((node) => ({
