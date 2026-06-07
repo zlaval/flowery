@@ -3,6 +3,7 @@ package com.zlrx.flowery.controller
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.zlrx.flowery.model.Diagram
 import com.zlrx.flowery.repository.DiagramRepository
+import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
@@ -15,15 +16,17 @@ class ConfigController(
     private val objectMapper: ObjectMapper
 ) {
 
+    private val logger = LoggerFactory.getLogger(ConfigController::class.java)
+
     /**
      * Save a new configuration.
-     * Converts the map configuration to a JSON string and persists it in the H2 database.
+     * Converts the map configuration to JSON bytes and persists it in the H2 database.
      */
     @PostMapping
     fun saveConfig(@RequestBody config: Map<String, Any>): ResponseEntity<Map<String, String>> {
         val name = config["name"] as? String ?: "Untitled Diagram"
-        val structureJson = objectMapper.writeValueAsString(config)
-        val saved = diagramRepository.save(Diagram(name = name, structure = structureJson))
+        val structureBytes = objectMapper.writeValueAsBytes(config)
+        val saved = diagramRepository.save(Diagram(name = name, structure = structureBytes))
         
         return ResponseEntity.status(HttpStatus.CREATED)
             .body(mapOf("id" to saved.id.toString()))
