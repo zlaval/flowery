@@ -90,7 +90,7 @@ export default function AiHelpChat() {
         {
           id: `msg-${Date.now()}-ai`,
           sender: 'ai',
-          text: 'I have successfully analyzed and updated your system architecture! Added the "AI Analytics Engine" function and synced it with your Database.',
+          text: 'I have successfully updated your architecture diagram! I set up a flow originating from the Start Trigger to the Order Service, which publishes events to the Kafka Topic and persists records to the Database.',
           timestamp: new Date(),
         },
       ]);
