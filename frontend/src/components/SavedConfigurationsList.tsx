@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useStore } from '../store/useStore';
-import { Server, RotateCw, Clipboard, ArrowRight, Layers, Cpu, Database } from 'lucide-react';
+import { Server, RotateCw, Layers, Cpu, Database } from 'lucide-react';
 
 export default function SavedConfigurationsList() {
   const { loadConfiguration, setMode } = useStore();
@@ -41,16 +41,6 @@ export default function SavedConfigurationsList() {
     }
   };
 
-  const copyId = async (id: string) => {
-    try {
-      await navigator.clipboard.writeText(id);
-      setToast('Configuration ID copied to clipboard!');
-      setTimeout(() => setToast(null), 3000);
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
   return (
     <div className="flex-1 h-full w-full bg-slate-950/40 p-8 overflow-y-auto flex flex-col gap-6 relative">
       {/* Header section */}
@@ -58,11 +48,8 @@ export default function SavedConfigurationsList() {
         <div>
           <h2 className="text-xl font-bold text-slate-100 flex items-center gap-2">
             <Server className="text-indigo-400" size={20} />
-            Server Architecture Repository
+            Flows
           </h2>
-          <p className="text-xs text-slate-400 mt-1">
-            Browse, restore, and edit architecture configurations saved on the active Spring Boot server.
-          </p>
         </div>
         <button
           onClick={fetchConfigs}
@@ -117,49 +104,28 @@ export default function SavedConfigurationsList() {
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           {Object.entries(configs).map(([id, configData]: [string, any]) => {
             const nodeCount = configData.nodes?.length || 0;
             const edgeCount = configData.edges?.length || 0;
-            const startLabel = configData.nodes?.find((n: any) => n.data?.type === 'start')?.data?.label || 'Start Trigger';
 
             return (
               <div
                 key={id}
-                className="group relative rounded-xl border border-slate-800 bg-slate-900/40 p-5 hover:border-indigo-500/50 hover:bg-slate-900/80 transition-all duration-300 flex flex-col justify-between gap-4 shadow-lg"
+                onClick={() => handleLoad(configData)}
+                className="group relative rounded-xl border border-slate-800 bg-slate-900/40 p-4 hover:border-indigo-500/50 hover:bg-slate-900/80 transition-all duration-300 flex flex-col justify-between gap-3 shadow-lg cursor-pointer hover:shadow-indigo-500/5 hover:-translate-y-0.5"
               >
-                <div className="flex flex-col gap-2">
-                  {/* Card Header ID */}
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] text-slate-500 uppercase tracking-widest font-mono font-medium">Saved Diagram</span>
-                    <button
-                      onClick={() => copyId(id)}
-                      title="Copy ID to Clipboard"
-                      className="text-slate-500 hover:text-indigo-400 transition cursor-pointer"
-                    >
-                      <Clipboard size={14} />
-                    </button>
-                  </div>
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-[9px] text-slate-500 uppercase tracking-widest font-mono font-medium">Saved Diagram</span>
                   
                   {/* Title / Trigger node name */}
                   <h3 className="font-bold text-slate-200 group-hover:text-indigo-400 transition-colors text-sm truncate" title={configData.name || 'Untitled Diagram'}>
                     {configData.name || 'Untitled Diagram'}
                   </h3>
-                  
-                  {/* Start Node Indicator */}
-                  <div className="text-[10px] text-slate-400 flex items-center gap-1.5 font-mono select-none">
-                    <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full" />
-                    <span>Start: {startLabel}</span>
-                  </div>
-                  
-                  {/* Truncated database ID display */}
-                  <code className="text-[10px] text-slate-400 bg-slate-950 px-2 py-1 rounded border border-slate-800 font-mono select-all truncate block">
-                    ID: {id}
-                  </code>
                 </div>
 
                 {/* Metadata Row */}
-                <div className="flex items-center gap-4 border-t border-slate-800/60 pt-3 text-xs text-slate-400">
+                <div className="flex items-center gap-3 border-t border-slate-800/60 pt-2 text-xs text-slate-400">
                   <div className="flex items-center gap-1 font-medium">
                     <Cpu size={12} className="text-slate-500" />
                     <span>{nodeCount} Nodes</span>
@@ -169,15 +135,6 @@ export default function SavedConfigurationsList() {
                     <span>{edgeCount} Paths</span>
                   </div>
                 </div>
-
-                {/* Load Button */}
-                <button
-                  onClick={() => handleLoad(configData)}
-                  className="w-full flex items-center justify-center gap-2 rounded-lg bg-slate-900 hover:bg-indigo-600 text-slate-300 hover:text-white border border-slate-800 hover:border-indigo-500 py-2 text-xs font-semibold transition-all cursor-pointer group-hover:shadow-md"
-                >
-                  Load Architecture
-                  <ArrowRight size={12} className="group-hover:translate-x-1 transition-transform" />
-                </button>
               </div>
             );
           })}
@@ -187,7 +144,7 @@ export default function SavedConfigurationsList() {
       {/* Floating toast notification inside list view */}
       {toast && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 rounded-xl bg-slate-900 border border-slate-800 px-4 py-3 shadow-2xl backdrop-blur-md animate-bounce z-50">
-          <Clipboard size={14} className="text-indigo-400" />
+          <Server size={14} className="text-indigo-400" />
           <p className="text-xs font-medium text-slate-200">{toast}</p>
         </div>
       )}
