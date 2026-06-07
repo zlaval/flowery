@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import Navbar from './components/Navbar';
 import Sidebar from './components/Sidebar';
@@ -6,10 +7,15 @@ import ControlPanel from './components/ControlPanel';
 import RoutingModal from './components/RoutingModal';
 import RenameModal from './components/RenameModal';
 import SavedConfigurationsList from './components/SavedConfigurationsList';
+import AiHelpChat from './components/AiHelpChat';
 import { useStore } from './store/useStore';
 
 function App() {
-  const { mode } = useStore();
+  const { mode, capabilities, fetchCapabilities } = useStore();
+
+  useEffect(() => {
+    fetchCapabilities();
+  }, [fetchCapabilities]);
 
   return (
     <div className="flex flex-col h-screen w-screen bg-slate-950 overflow-hidden text-slate-100 font-sans">
@@ -35,6 +41,9 @@ function App() {
 
                 {/* Rename popup on node click */}
                 <RenameModal />
+
+                {/* AI Architecture Helper (Design Mode only when AI_HELP is active) */}
+                {mode === 'edit' && capabilities.includes('AI_HELP') && <AiHelpChat />}
               </div>
             </ReactFlowProvider>
 

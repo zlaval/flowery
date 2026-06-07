@@ -84,6 +84,7 @@ interface AppState {
   // V3 Simulation States
   activeMessages: MessagePacket[]; // List of concurrent active message packets
   simulationFailedEdges: string[]; // List of edge IDs that failed condition evaluation
+  capabilities: string[];
 
   // Graph manipulation actions
   addNode: (type: NodeType) => void;
@@ -131,6 +132,7 @@ interface AppState {
     currentLabel: string;
   } | null;
   setRenameModal: (modal: { isOpen: boolean; nodeId: string; currentLabel: string } | null) => void;
+  fetchCapabilities: () => Promise<void>;
 }
 
 // Timer reference for the simulation loop
@@ -470,6 +472,7 @@ export const useStore = create<AppState>((set, get) => {
     simulationFailedEdges: [],
     routingModal: null,
     renameModal: null,
+    capabilities: [],
 
     // Flow handlers
     onNodesChange: (changes) => {
@@ -878,6 +881,18 @@ export const useStore = create<AppState>((set, get) => {
         activeMessages: [],
         simulationFailedEdges: [],
       });
+    },
+
+    fetchCapabilities: async () => {
+      try {
+        const response = await fetch('http://localhost:8080/api/capabilities');
+        if (response.ok) {
+          const data = await response.json();
+          set({ capabilities: data });
+        }
+      } catch (err) {
+        console.error('Failed to fetch capabilities:', err);
+      }
     },
 
     // Selection
