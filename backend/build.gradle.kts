@@ -19,18 +19,18 @@ repositories {
 }
 
 dependencies {
-	//implementation("org.springframework.boot:spring-boot-h2console")
+	implementation("org.springframework.boot:spring-boot-h2console")
 	implementation("org.springframework.boot:spring-boot-starter-actuator")
-	//implementation("org.springframework.boot:spring-boot-starter-data-jdbc")
-	//implementation("org.springframework.boot:spring-boot-starter-data-rest")
-	//implementation("org.springframework.boot:spring-boot-starter-flyway")
+	implementation("org.springframework.boot:spring-boot-starter-data-jdbc")
+	implementation("org.springframework.boot:spring-boot-starter-data-rest")
+	implementation("org.springframework.boot:spring-boot-starter-flyway")
 	implementation("org.springframework.boot:spring-boot-starter-web")
 	//implementation("org.flywaydb:flyway-database-postgresql")
 	implementation("org.jetbrains.kotlin:kotlin-reflect")
 	implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
 	developmentOnly("org.springframework.boot:spring-boot-devtools")
 	//developmentOnly("org.springframework.boot:spring-boot-docker-compose")
-	//runtimeOnly("com.h2database:h2")
+	runtimeOnly("com.h2database:h2")
 	//runtimeOnly("org.postgresql:postgresql")
 }
 

@@ -3,7 +3,7 @@ import { useStore } from '../store/useStore';
 import { Plus, Save, Server, Network, Edit3, Cpu, Sparkles } from 'lucide-react';
 
 export default function Navbar() {
-  const { mode, setMode, clearCanvas, nodes, edges, triggerNodeId } = useStore();
+  const { mode, setMode, clearCanvas, nodes, edges, triggerNodeId, diagramName, setDiagramName } = useStore();
   const [toast, setToast] = useState<string | null>(null);
 
   // Auto-clear toast after 3 seconds
@@ -28,6 +28,7 @@ export default function Navbar() {
   const handleSaveToServer = async () => {
     const config = {
       version: '1.0',
+      name: diagramName,
       triggerNodeId,
       nodes,
       edges,
@@ -63,18 +64,31 @@ export default function Navbar() {
 
   return (
     <header className="relative flex h-16 w-full items-center justify-between border-b border-slate-800 bg-slate-950 px-6 z-20">
-      {/* Branding Logo */}
-      <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-500/30">
-          <Network size={20} className="animate-pulse" />
+      {/* Branding Logo & Title Input */}
+      <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3 border-r border-slate-800/80 pr-4">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-500/30">
+            <Network size={20} className="animate-pulse" />
+          </div>
+          <div>
+            <h1 className="text-sm font-bold text-slate-100 tracking-wide m-0 p-0 flex items-center gap-1.5 leading-none">
+              Flowery
+            </h1>
+            <span className="text-[9px] text-slate-400 font-mono tracking-wider block mt-1 uppercase">
+              Simulator
+            </span>
+          </div>
         </div>
-        <div>
-          <h1 className="text-base font-bold text-slate-100 tracking-wide m-0 p-0 flex items-center gap-1.5 leading-none">
-            Flowery <span className="text-xs font-medium text-indigo-400 bg-indigo-950 px-2 py-0.5 rounded-full border border-indigo-900">v1.0</span>
-          </h1>
-          <span className="text-[10px] text-slate-400 font-mono tracking-wider block mt-1 uppercase">
-            Architecture Flow Simulator
-          </span>
+
+        {/* Diagram Name input */}
+        <div className="flex items-center">
+          <input
+            type="text"
+            value={diagramName}
+            onChange={(e) => setDiagramName(e.target.value)}
+            className="bg-transparent border border-transparent hover:border-slate-800 focus:border-indigo-500/60 focus:bg-slate-900/40 rounded-lg px-2.5 py-1 text-xs font-semibold text-slate-200 focus:outline-none transition-all duration-150 w-48"
+            placeholder="Untitled Diagram"
+          />
         </div>
       </div>
 

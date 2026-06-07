@@ -85,6 +85,7 @@ interface AppState {
   activeMessages: MessagePacket[]; // List of concurrent active message packets
   simulationFailedEdges: string[]; // List of edge IDs that failed condition evaluation
   capabilities: string[];
+  diagramName: string;
 
   // Graph manipulation actions
   addNode: (type: NodeType) => void;
@@ -97,10 +98,12 @@ interface AppState {
   clearCanvas: () => void;
   loadConfiguration: (config: {
     version?: string;
+    name?: string;
     triggerNodeId: string | null;
     nodes: AppNode[];
     edges: AppEdge[];
   }) => void;
+  setDiagramName: (name: string) => void;
   
   // Selection actions
   selectElement: (element: { type: 'node' | 'edge'; id: string } | null) => void;
@@ -473,6 +476,7 @@ export const useStore = create<AppState>((set, get) => {
     routingModal: null,
     renameModal: null,
     capabilities: [],
+    diagramName: 'Untitled Diagram',
 
     // Flow handlers
     onNodesChange: (changes) => {
@@ -844,6 +848,7 @@ export const useStore = create<AppState>((set, get) => {
         currentStep: 0,
         activeMessages: [],
         simulationFailedEdges: [],
+        diagramName: 'Untitled Diagram',
       });
     },
 
@@ -880,6 +885,7 @@ export const useStore = create<AppState>((set, get) => {
         currentStep: 0,
         activeMessages: [],
         simulationFailedEdges: [],
+        diagramName: config.name || 'Untitled Diagram',
       });
     },
 
@@ -893,6 +899,10 @@ export const useStore = create<AppState>((set, get) => {
       } catch (err) {
         console.error('Failed to fetch capabilities:', err);
       }
+    },
+
+    setDiagramName: (name) => {
+      set({ diagramName: name });
     },
 
     // Selection

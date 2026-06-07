@@ -142,13 +142,19 @@ export default function SavedConfigurationsList() {
                   </div>
                   
                   {/* Title / Trigger node name */}
-                  <h3 className="font-bold text-slate-200 group-hover:text-indigo-400 transition-colors text-sm truncate">
-                    {startLabel}
+                  <h3 className="font-bold text-slate-200 group-hover:text-indigo-400 transition-colors text-sm truncate" title={configData.name || 'Untitled Diagram'}>
+                    {configData.name || 'Untitled Diagram'}
                   </h3>
                   
-                  {/* Truncated UUID display */}
+                  {/* Start Node Indicator */}
+                  <div className="text-[10px] text-slate-400 flex items-center gap-1.5 font-mono select-none">
+                    <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full" />
+                    <span>Start: {startLabel}</span>
+                  </div>
+                  
+                  {/* Truncated database ID display */}
                   <code className="text-[10px] text-slate-400 bg-slate-950 px-2 py-1 rounded border border-slate-800 font-mono select-all truncate block">
-                    {id}
+                    ID: {id}
                   </code>
                 </div>
 

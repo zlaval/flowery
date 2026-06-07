@@ -1,46 +1,58 @@
 package com.zlrx.flowery.controller
 
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.zlrx.flowery.model.Diagram
+import com.zlrx.flowery.repository.DiagramRepository
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
-import java.util.UUID
-import java.util.concurrent.ConcurrentHashMap
 
 @RestController
 @RequestMapping("/api/configs")
 @CrossOrigin(origins = ["*"]) // Enable CORS for Vite frontend integration
-class ConfigController {
-
-    // Thread-safe map to store configurations in-memory
-    private val configStorage = ConcurrentHashMap<UUID, Any>()
+class ConfigController(
+    private val diagramRepository: DiagramRepository,
+    private val objectMapper: ObjectMapper
+) {
 
     /**
      * Save a new configuration.
-     * Generates a unique UUID and stores the configuration object in the map.
+     * Converts the map configuration to a JSON string and persists it in the H2 database.
      */
     @PostMapping
-    fun saveConfig(@RequestBody config: Any): ResponseEntity<Map<String, String>> {
-        val id = UUID.randomUUID()
-        configStorage[id] = config
+    fun saveConfig(@RequestBody config: Map<String, Any>): ResponseEntity<Map<String, String>> {
+        val name = config["name"] as? String ?: "Untitled Diagram"
+        val structureJson = objectMapper.writeValueAsString(config)
+        val saved = diagramRepository.save(Diagram(name = name, structure = structureJson))
         
         return ResponseEntity.status(HttpStatus.CREATED)
-            .body(mapOf("id" to id.toString()))
+            .body(mapOf("id" to saved.id.toString()))
     }
 
     /**
-     * Retrieve a configuration by its UUID key.
+     * Retrieve a configuration by its database ID key.
      */
     @GetMapping("/{id}")
-    fun getConfig(@PathVariable id: UUID): ResponseEntity<Any> {
-        val config = configStorage[id] ?: return ResponseEntity.notFound().build()
-        return ResponseEntity.ok(config)
+    fun getConfig(@PathVariable id: Long): ResponseEntity<Any> {
+        val diagram = diagramRepository.findById(id).orElse(null) ?: return ResponseEntity.notFound().build()
+        val configMap = objectMapper.readValue(diagram.structure, Map::class.java).toMutableMap()
+        configMap["name"] = diagram.name
+        configMap["id"] = diagram.id
+        return ResponseEntity.ok(configMap)
     }
 
     /**
-     * List all saved configurations.
+     * List all saved configurations formatted as a Map from ID string to configuration data.
      */
     @GetMapping
-    fun listConfigs(): ResponseEntity<Map<UUID, Any>> {
-        return ResponseEntity.ok(configStorage)
+    fun listConfigs(): ResponseEntity<Map<String, Any>> {
+        val diagrams = diagramRepository.findAll()
+        val configsMap = diagrams.associate {
+            val configMap = objectMapper.readValue(it.structure, Map::class.java).toMutableMap()
+            configMap["name"] = it.name
+            configMap["id"] = it.id
+            it.id.toString() to configMap
+        }
+        return ResponseEntity.ok(configsMap)
     }
 }
