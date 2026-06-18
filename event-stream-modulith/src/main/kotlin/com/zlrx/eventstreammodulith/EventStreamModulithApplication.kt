@@ -1,12 +1,10 @@
 package com.zlrx.eventstreammodulith
 
-import com.zlrx.eventstreammodulith.order.OrderCreatedEvent
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.slf4j.LoggerFactory
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.runApplication
 import org.springframework.kafka.annotation.KafkaListener
-import org.springframework.modulith.events.ApplicationModuleListener
 
 @SpringBootApplication
 class EventStreamModulithApplication {
@@ -18,10 +16,10 @@ class EventStreamModulithApplication {
         logger.info("[Kafka] Received order created event. key: ${record.key()} value: ${record.value()}")
     }
 
-    @ApplicationModuleListener
-    fun onOrderCreatedEventBus(event: OrderCreatedEvent) {
-        logger.info("[BUS] Received order created event. $event")
-    }
+//    @ApplicationModuleListener
+//    fun onOrderCreatedEventBus(event: OrderCreatedEvent) {
+//        logger.info("[BUS] Received order created event. $event")
+//    }
 
 }
 
